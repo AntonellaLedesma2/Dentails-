@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Variables de entorno (nunca subir al repo)
+.env
+frontend/.env
+backend/.env
+
+# Expo
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/expo-env.d.ts
+
+# Nativo generado (no se edita a mano)
+frontend/ios/
+frontend/android/
+
+# Logs
+*.log
+npm-debug.*
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

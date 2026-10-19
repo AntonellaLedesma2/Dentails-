@@ -12,8 +12,7 @@ const PROVIDERS = {
   google: {
     label: 'Google',
     icon: '🌐',
-    // Reemplazá con tu clientId de Google Cloud Console
-    clientId: 'TU_GOOGLE_CLIENT_ID',
+    clientId: '721085208228-nej5f804cd8frbdsl43tg8ej4lql3q7g.apps.googleusercontent.com',
     discovery: {
       authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenEndpoint: 'https://oauth2.googleapis.com/token',

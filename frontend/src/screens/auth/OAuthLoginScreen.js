@@ -31,14 +31,15 @@ const PROVIDERS = {
     scopes: ['read:user', 'user:email'],
   },
   facebook: {
-    label: 'Facebook',
-    icon: '📘',
-    clientId: 'TU_FACEBOOK_APP_ID',
+    label: 'Discord',
+    icon: '🎮',
+    clientId: '1561568605676634152',
     discovery: {
-      authorizationEndpoint: 'https://www.facebook.com/v18.0/dialog/oauth',
-      tokenEndpoint: 'https://graph.facebook.com/v18.0/oauth/access_token',
+      authorizationEndpoint: 'https://discord.com/oauth2/authorize',
+      tokenEndpoint: 'https://discord.com/api/oauth2/token',
+      userInfoEndpoint: 'https://discord.com/api/users/@me',
     },
-    scopes: ['public_profile', 'email'],
+    scopes: ['identify', 'email'],
   },
 };
 

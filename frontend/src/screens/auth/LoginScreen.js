@@ -104,7 +104,7 @@ export default function LoginScreen({ navigation }) {
           {[
             { provider: 'google',   label: 'Google',   icon: 'G'  },
             { provider: 'github',   label: 'GitHub',   icon: '🐙' },
-            { provider: 'facebook', label: 'Facebook', icon: 'f'  },
+            { provider: 'facebook', label: 'Discord',  icon: '🎮' },
           ].map(({ provider, label, icon }) => (
             <TouchableOpacity
               key={provider}

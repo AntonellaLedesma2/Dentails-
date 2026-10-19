@@ -23,7 +23,7 @@ const PROVIDERS = {
   github: {
     label: 'GitHub',
     icon: '🐙',
-    clientId: 'TU_GITHUB_CLIENT_ID',
+    clientId: 'Ov23ct5VVwItyH442s5I',
     discovery: {
       authorizationEndpoint: 'https://github.com/login/oauth/authorize',
       tokenEndpoint: 'https://github.com/login/oauth/access_token',

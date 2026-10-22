@@ -67,6 +67,7 @@ const Colors = {
     administrador: { bg: '#EBF2FF', text: '#1342A8', dot: '#1A56DB' },
     recepcion:     { bg: '#DEF7EC', text: '#03543F', dot: '#0E9F6E' },
     odontologo:    { bg: '#FDF6B2', text: '#723B13', dot: '#E3A008' },
+    usuario:       { bg: '#F1EDFF', text: '#5B3DA8', dot: '#7556C9' },
   },
 };
 

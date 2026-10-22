@@ -91,7 +91,8 @@ export default function AppointmentsScreen({ navigation }) {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id })}
+        onPress={canCreate ? () => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id }) : undefined}
+        disabled={!canCreate}
         activeOpacity={0.85}
       >
         {/* Hora y duración */}

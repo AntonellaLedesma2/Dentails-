@@ -1,24 +1,35 @@
 const pool = require('../config/db');
 
 const PatientModel = {
-  async findAll({ search = '', estado = 'activo' } = {}) {
+  async findAll({ search = '', estado = 'activo', odontologoId = null } = {}) {
     const like = `%${search}%`;
+    const doctorScope = odontologoId
+      ? 'AND EXISTS (SELECT 1 FROM turnos t WHERE t.paciente_id = pacientes.id AND t.odontologo_id = ?)'
+      : '';
+    const params = [estado, like, like, like, like];
+    if (odontologoId) params.push(odontologoId);
     const [rows] = await pool.execute(
       `SELECT id, nombre, apellido, dni, fecha_nacimiento, telefono, correo,
               obra_social, estado, creado_en
        FROM pacientes
        WHERE estado = ?
          AND (nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR correo LIKE ?)
+         ${doctorScope}
        ORDER BY apellido ASC, nombre ASC`,
-      [estado, like, like, like, like]
+      params
     );
     return rows;
   },
 
-  async findById(id) {
+  async findById(id, odontologoId = null) {
+    const doctorScope = odontologoId
+      ? 'AND EXISTS (SELECT 1 FROM turnos t WHERE t.paciente_id = pacientes.id AND t.odontologo_id = ?)'
+      : '';
+    const params = [id];
+    if (odontologoId) params.push(odontologoId);
     const [rows] = await pool.execute(
-      `SELECT * FROM pacientes WHERE id = ? LIMIT 1`,
-      [id]
+      `SELECT * FROM pacientes WHERE id = ? ${doctorScope} LIMIT 1`,
+      params
     );
     return rows[0] || null;
   },

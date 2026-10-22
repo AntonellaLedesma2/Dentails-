@@ -13,7 +13,7 @@ import { TouchableOpacity } from 'react-native';
 const rolesOptions = Object.values(ROLES);
 
 export default function CreateUserScreen({ navigation }) {
-  const [form, setForm]   = useState({ nombre: '', apellido: '', correo: '', password: '', rol: ROLES.RECEPCION });
+  const [form, setForm]   = useState({ nombre: '', apellido: '', correo: '', password: '', rol: ROLES.USUARIO });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -85,9 +85,9 @@ const styles = StyleSheet.create({
   flex:      { flex: 1, backgroundColor: Colors.background },
   container: { padding: 20, paddingBottom: 40 },
   label: { fontSize: 14, fontWeight: '500', color: Colors.text.primary, marginBottom: 8 },
-  rolesRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  rolesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   roleChip: {
-    flex: 1,
+    width: '48%',
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1.5,

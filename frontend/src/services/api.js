@@ -1,11 +1,21 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import secureStorage from './secureStorage';
 
 // Cambiá esta IP por la de tu máquina en la red local cuando pruebes en dispositivo físico
 // Para emulador Android: 10.0.2.2  |  Para dispositivo físico: IP de tu PC
 // Emulador Android: http://10.0.2.2:3000/api
 // Dispositivo físico: usar la IP de tu PC en la red local
-const BASE_URL = 'http://192.168.100.34:3000/api';
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL;
+const webApiUrl = process.env.EXPO_PUBLIC_API_URL_WEB;
+const nativeApiUrl = process.env.EXPO_PUBLIC_API_URL_NATIVE;
+const emulatorApiUrl = 'http://10.0.2.2:3000/api';
+const defaultApiUrl = Platform.OS === 'web' ? 'http://localhost:3000/api' : emulatorApiUrl;
+// EXPO_PUBLIC_API_URL_NATIVE should point at the computer's LAN IP when using
+// a physical phone. 10.0.2.2 is only reachable from the Android emulator.
+const BASE_URL = Platform.OS === 'web'
+  ? webApiUrl || (configuredApiUrl?.includes('10.0.2.2') ? configuredApiUrl.replace('10.0.2.2', 'localhost') : configuredApiUrl) || defaultApiUrl
+  : nativeApiUrl || configuredApiUrl || defaultApiUrl;
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -18,7 +28,7 @@ const api = axios.create({
 // ─── Interceptor: adjunta el access token a cada request ──────────────────────
 api.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('accessToken');
+    const token = await secureStorage.getItemAsync('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -41,19 +51,19 @@ api.interceptors.response.use(
       original._retry = true;
 
       try {
-        const refreshToken = await SecureStore.getItemAsync('refreshToken');
+        const refreshToken = await secureStorage.getItemAsync('refreshToken');
         const res = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
 
-        await SecureStore.setItemAsync('accessToken', res.data.accessToken);
-        await SecureStore.setItemAsync('refreshToken', res.data.refreshToken);
+        await secureStorage.setItemAsync('accessToken', res.data.accessToken);
+        await secureStorage.setItemAsync('refreshToken', res.data.refreshToken);
 
         original.headers.Authorization = `Bearer ${res.data.accessToken}`;
         return api(original);
       } catch {
         // Si el refresh falla, limpiar sesión
-        await SecureStore.deleteItemAsync('accessToken');
-        await SecureStore.deleteItemAsync('refreshToken');
-        await SecureStore.deleteItemAsync('user');
+        await secureStorage.deleteItemAsync('accessToken');
+        await secureStorage.deleteItemAsync('refreshToken');
+        await secureStorage.deleteItemAsync('user');
       }
     }
 

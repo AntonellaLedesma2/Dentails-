@@ -5,7 +5,8 @@ const { logActivity } = require('../utils/activityLogger');
 async function getPatients(req, res, next) {
   try {
     const { search = '', estado = 'activo' } = req.query;
-    const patients = await PatientModel.findAll({ search, estado });
+    const odontologoId = req.user.rol === 'odontologo' ? req.user.id : null;
+    const patients = await PatientModel.findAll({ search, estado, odontologoId });
     return res.status(200).json({ patients });
   } catch (err) { next(err); }
 }
@@ -13,7 +14,8 @@ async function getPatients(req, res, next) {
 // GET /api/patients/:id
 async function getPatientById(req, res, next) {
   try {
-    const patient = await PatientModel.findById(req.params.id);
+    const odontologoId = req.user.rol === 'odontologo' ? req.user.id : null;
+    const patient = await PatientModel.findById(req.params.id, odontologoId);
     if (!patient) return res.status(404).json({ error: true, message: 'Paciente no encontrado' });
     return res.status(200).json({ patient });
   } catch (err) { next(err); }

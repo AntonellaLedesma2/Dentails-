@@ -1,5 +1,5 @@
 import api from './api';
-import * as SecureStore from 'expo-secure-store';
+import secureStorage from './secureStorage';
 
 const authService = {
   /**
@@ -21,8 +21,8 @@ const authService = {
   /**
    * Login con OAuth (Google, Facebook, GitHub)
    */
-  async oauthLogin(provider, oauthId, email, nombre, apellido) {
-    const res = await api.post('/auth/oauth', { provider, oauthId, email, nombre, apellido });
+  async oauthLogin(provider, code, redirectUri, codeVerifier, clientId) {
+    const res = await api.post('/auth/oauth', { provider, code, redirectUri, codeVerifier, clientId });
     return res.data;
   },
 
@@ -33,9 +33,9 @@ const authService = {
     try {
       await api.post('/auth/logout');
     } finally {
-      await SecureStore.deleteItemAsync('accessToken');
-      await SecureStore.deleteItemAsync('refreshToken');
-      await SecureStore.deleteItemAsync('user');
+      await secureStorage.deleteItemAsync('accessToken');
+      await secureStorage.deleteItemAsync('refreshToken');
+      await secureStorage.deleteItemAsync('user');
     }
   },
 
@@ -43,17 +43,17 @@ const authService = {
    * Guardar tokens y datos del usuario en SecureStore
    */
   async saveSession(accessToken, refreshToken, user) {
-    await SecureStore.setItemAsync('accessToken', accessToken);
-    await SecureStore.setItemAsync('refreshToken', refreshToken);
-    await SecureStore.setItemAsync('user', JSON.stringify(user));
+    await secureStorage.setItemAsync('accessToken', accessToken);
+    await secureStorage.setItemAsync('refreshToken', refreshToken);
+    await secureStorage.setItemAsync('user', JSON.stringify(user));
   },
 
   /**
    * Recuperar sesión guardada
    */
   async getStoredSession() {
-    const token = await SecureStore.getItemAsync('accessToken');
-    const userStr = await SecureStore.getItemAsync('user');
+    const token = await secureStorage.getItemAsync('accessToken');
+    const userStr = await secureStorage.getItemAsync('user');
     if (!token || !userStr) return null;
     return { token, user: JSON.parse(userStr) };
   },

@@ -184,14 +184,137 @@ async function logout(req, res, next) {
 
 // ─── OAuth callback genérico ─────────────────────────────────────────────────
 
+function allowedOAuthRedirectUris() {
+  const configured = (process.env.OAUTH_REDIRECT_URIS || '').split(',').map((uri) => uri.trim()).filter(Boolean);
+  if (process.env.OAUTH_REDIRECT_URI) configured.push(process.env.OAUTH_REDIRECT_URI.trim());
+  if (process.env.NODE_ENV !== 'production') configured.push('http://localhost:8081');
+  configured.push('com.dentalis.app://oauth');
+  return [...new Set(configured)];
+}
+
+function oauthClientConfigurations(provider) {
+  if (provider === 'google') {
+    return [
+      {
+        clientId: process.env.GOOGLE_WEB_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_WEB_CLIENT_SECRET,
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+      },
+      {
+        clientId: process.env.GOOGLE_ANDROID_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '721085208228-nej5f804cd8frbdsl43tg8ej4lql3q7g.apps.googleusercontent.com',
+        clientSecret: process.env.GOOGLE_ANDROID_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+      },
+    ].filter((config) => config.clientId);
+  }
+
+  const config = provider === 'github'
+    ? {
+        clientId: process.env.GITHUB_WEB_CLIENT_ID || process.env.GITHUB_CLIENT_ID || 'Ov23ct5VVwItyH442s5I',
+        clientSecret: process.env.GITHUB_WEB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET,
+        tokenUrl: 'https://github.com/login/oauth/access_token',
+      }
+    : {
+        clientId: process.env.FACEBOOK_APP_ID,
+        clientSecret: process.env.FACEBOOK_APP_SECRET,
+        tokenUrl: 'https://graph.facebook.com/v26.0/oauth/access_token',
+      };
+  return config.clientId ? [config] : [];
+}
+
+async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVerifier) {
+  if (!allowedOAuthRedirectUris().includes(redirectUri)) {
+    const error = new Error(`URI de retorno no permitida: ${redirectUri}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const config = oauthClientConfigurations(provider).find((candidate) => candidate.clientId === clientId);
+  if (!config || !config.clientSecret) {
+    const error = new Error(`El cliente OAuth de ${provider} no está configurado correctamente en el servidor.`);
+    error.status = 503;
+    throw error;
+  }
+
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    code,
+    redirect_uri: redirectUri,
+  });
+  if (provider !== 'facebook') params.set('code_verifier', codeVerifier);
+  const tokenResponse = await fetch(config.tokenUrl, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  });
+  const tokenData = await tokenResponse.json();
+  const accessToken = tokenData.access_token;
+  if (!tokenResponse.ok || !accessToken) {
+    const error = new Error('El proveedor rechazó el código de autenticación. Verificá las credenciales y la URI de retorno.');
+    error.status = 401;
+    throw error;
+  }
+
+  let profile;
+  if (provider === 'google') {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    profile = await response.json();
+    if (!response.ok || profile.email_verified !== true) {
+      const error = new Error('Google no devolvió un correo verificado.');
+      error.status = 401;
+      throw error;
+    }
+    profile.oauthId = profile.sub;
+  } else if (provider === 'github') {
+    const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github+json' };
+    const [userResponse, emailsResponse] = await Promise.all([
+      fetch('https://api.github.com/user', { headers }),
+      fetch('https://api.github.com/user/emails', { headers }),
+    ]);
+    const user = await userResponse.json();
+    const emails = await emailsResponse.json();
+    const email = Array.isArray(emails)
+      ? emails.find((item) => item.primary && item.verified)?.email
+      : null;
+    if (!userResponse.ok || !emailsResponse.ok || !user.id || !email) {
+      const error = new Error('GitHub no devolvió un correo verificado y principal.');
+      error.status = 401;
+      throw error;
+    }
+    profile = { oauthId: String(user.id), email, name: user.name || user.login };
+  } else {
+    const response = await fetch(`https://graph.facebook.com/v26.0/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+    profile = await response.json();
+    if (!response.ok || !profile.id || !profile.email) {
+      const error = new Error('Facebook no devolvió el correo. Revisá el permiso email en Meta for Developers.');
+      error.status = 401;
+      throw error;
+    }
+    profile.oauthId = profile.id;
+  }
+
+  const parts = (profile.name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    oauthId: String(profile.oauthId),
+    email: profile.email,
+    nombre: parts.shift() || '',
+    apellido: parts.join(' '),
+  };
+}
+
 async function oauthCallback(req, res, next) {
   try {
-    const { provider, oauthId, email, nombre, apellido } = req.body;
+    const { provider, code, redirectUri, codeVerifier, clientId } = req.body;
 
     const validProviders = ['google', 'facebook', 'github'];
     if (!validProviders.includes(provider)) {
       return res.status(400).json({ error: true, message: 'Proveedor no soportado' });
     }
+
+    const { oauthId, email } = await exchangeOAuthCode(provider, clientId, code, redirectUri, codeVerifier);
 
     // Buscar si ya existe un usuario con ese OAuth ID
     let user = await UserModel.findByOAuthId(provider, oauthId);

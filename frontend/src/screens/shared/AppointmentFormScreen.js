@@ -9,6 +9,8 @@ import userService         from '../../services/userService';
 import Button    from '../../components/Button';
 import Input     from '../../components/Input';
 import Colors    from '../../constants/colors';
+import { useAuth } from '../../context/AuthContext';
+import { ROLES } from '../../constants/roles';
 
 const ESTADOS = ['pendiente', 'confirmado', 'reprogramado', 'cancelado', 'realizado'];
 const ESTADO_LABELS = {
@@ -23,6 +25,7 @@ const EMPTY = {
 };
 
 export default function AppointmentFormScreen({ route, navigation }) {
+  const { user } = useAuth();
   const { mode, appointmentId, fecha: fechaDefault } = route.params;
   const isEdit = mode === 'edit';
 
@@ -31,6 +34,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
   const [odontologos, setOdontologos] = useState([]);
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [initialEstado, setInitialEstado] = useState('pendiente');
 
   // Cargar listas de pacientes y odontólogos
   useEffect(() => {
@@ -55,6 +59,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
             notas:        appt.notas    || '',
             estado:       appt.estado   || 'pendiente',
           });
+          setInitialEstado(appt.estado || 'pendiente');
         }
       } catch {
         Alert.alert('Error', 'No se pudieron cargar los datos');
@@ -98,14 +103,14 @@ export default function AppointmentFormScreen({ route, navigation }) {
         duracionMin:  form.duracionMin,
         motivo:       form.motivo || null,
         notas:        form.notas  || null,
-        estado:       form.estado,
       };
 
       if (isEdit) {
         await appointmentService.update(appointmentId, payload);
+        if (initialEstado !== form.estado) await appointmentService.changeEstado(appointmentId, form.estado);
         Alert.alert('Éxito', 'Turno actualizado', [{ text: 'OK', onPress: () => navigation.goBack() }]);
       } else {
-        await appointmentService.create(payload);
+        await appointmentService.create({ ...payload, estado: form.estado });
         Alert.alert('Éxito', 'Turno creado correctamente', [{ text: 'OK', onPress: () => navigation.goBack() }]);
       }
     } catch (err) {
@@ -223,7 +228,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
             <Text style={styles.sectionLabel}>ESTADO</Text>
             <View style={styles.section}>
               <View style={styles.chipRow}>
-                {ESTADOS.map((e) => (
+                {ESTADOS.filter((e) => user?.rol !== ROLES.RECEPCION || e !== 'realizado').map((e) => (
                   <TouchableOpacity
                     key={e}
                     style={[styles.chip, form.estado === e && styles.chipActive]}

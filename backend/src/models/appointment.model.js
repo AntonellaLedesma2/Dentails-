@@ -71,7 +71,8 @@ const AppointmentModel = {
          notas         = COALESCE(?, notas),
          estado        = COALESCE(?, estado)
        WHERE id = ?`,
-      [pacienteId, odontologoId, fecha, hora, duracionMin, motivo, notas, estado, id]
+      [pacienteId ?? null, odontologoId ?? null, fecha ?? null, hora ?? null,
+       duracionMin ?? null, motivo ?? null, notas ?? null, estado ?? null, id]
     );
     return result.affectedRows > 0;
   },

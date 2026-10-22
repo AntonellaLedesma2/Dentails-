@@ -6,6 +6,17 @@ const { login, verifyTwoFA, refreshToken, logout, oauthCallback } = require('../
 const { authenticate } = require('../middlewares/auth.middleware');
 const { validate } = require('../middlewares/validate.middleware');
 
+function allowedOAuthRedirectUris() {
+  const uris = (process.env.OAUTH_REDIRECT_URIS || '')
+    .split(',')
+    .map((uri) => uri.trim())
+    .filter(Boolean);
+  if (process.env.OAUTH_REDIRECT_URI) uris.push(process.env.OAUTH_REDIRECT_URI.trim());
+  if (process.env.NODE_ENV !== 'production') uris.push('http://localhost:8081');
+  uris.push('com.dentalis.app://oauth');
+  return [...new Set(uris)];
+}
+
 // POST /api/auth/login
 router.post(
   '/login',
@@ -44,8 +55,10 @@ router.post(
   '/oauth',
   [
     body('provider').isIn(['google', 'facebook', 'github']).withMessage('Proveedor inválido'),
-    body('oauthId').notEmpty().withMessage('oauthId requerido'),
-    body('email').isEmail().withMessage('Email inválido'),
+    body('code').notEmpty().withMessage('Código OAuth requerido'),
+    body('redirectUri').custom((uri) => allowedOAuthRedirectUris().includes(uri)).withMessage('URI de retorno inválida'),
+    body('clientId').notEmpty().withMessage('Cliente OAuth requerido'),
+    body('codeVerifier').isLength({ min: 43, max: 128 }).withMessage('Verificador OAuth inválido'),
   ],
   validate,
   oauthCallback

@@ -85,8 +85,8 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'LOGIN', user: data.user, token: data.accessToken });
   }
 
-  async function oauthLogin(provider, oauthId, email, nombre, apellido) {
-    const data = await authService.oauthLogin(provider, oauthId, email, nombre, apellido);
+  async function oauthLogin(provider, code, redirectUri, codeVerifier, clientId) {
+    const data = await authService.oauthLogin(provider, code, redirectUri, codeVerifier, clientId);
     await authService.saveSession(data.accessToken, data.refreshToken, data.user);
     dispatch({ type: 'LOGIN', user: data.user, token: data.accessToken });
   }

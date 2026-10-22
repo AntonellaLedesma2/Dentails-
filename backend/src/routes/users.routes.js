@@ -45,7 +45,7 @@ router.post(
       .isLength({ min: 8 })
       .withMessage('La contraseña debe tener al menos 8 caracteres'),
     body('rol')
-      .isIn(['administrador', 'recepcion', 'odontologo'])
+      .isIn(['administrador', 'recepcion', 'odontologo', 'usuario'])
       .withMessage('Rol inválido'),
   ],
   validate,
@@ -59,7 +59,7 @@ router.patch(
   [
     body('rol')
       .optional()
-      .isIn(['administrador', 'recepcion', 'odontologo'])
+      .isIn(['administrador', 'recepcion', 'odontologo', 'usuario'])
       .withMessage('Rol inválido'),
     body('estado')
       .optional()

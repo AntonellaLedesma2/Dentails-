@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../constants/roles';
-import Colors from '../constants/colors';
+import { ROLES }   from '../constants/roles';
+import Colors      from '../constants/colors';
 
 // Auth
 import LoginScreen       from '../screens/auth/LoginScreen';
@@ -17,33 +17,35 @@ import AdminHomeScreen   from '../screens/admin/AdminHomeScreen';
 import UsersListScreen   from '../screens/admin/UsersListScreen';
 import CreateUserScreen  from '../screens/admin/CreateUserScreen';
 import EditUserScreen    from '../screens/admin/EditUserScreen';
+import ReportsScreen     from '../screens/admin/ReportsScreen';
 
 // Recepción
 import RecepcionHomeScreen from '../screens/recepcion/RecepcionHomeScreen';
+import PaymentsScreen      from '../screens/recepcion/PaymentsScreen';
+import NewPaymentScreen    from '../screens/recepcion/NewPaymentScreen';
 
 // Odontólogo
-import OdontologoHomeScreen from '../screens/odontologo/OdontologoHomeScreen';
+import OdontologoHomeScreen  from '../screens/odontologo/OdontologoHomeScreen';
+import TreatmentsScreen      from '../screens/odontologo/TreatmentsScreen';
+import TreatmentFormScreen   from '../screens/odontologo/TreatmentFormScreen';
+import ClinicalRecordScreen  from '../screens/odontologo/ClinicalRecordScreen';
 
 // Compartidas
 import ProfileScreen        from '../screens/shared/ProfileScreen';
 import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import PlaceholderScreen    from '../screens/shared/PlaceholderScreen';
-
-// Pacientes (implementadas)
-import PatientsScreen      from '../screens/shared/PatientsScreen';
-import PatientDetailScreen from '../screens/shared/PatientDetailScreen';
-import PatientFormScreen   from '../screens/shared/PatientFormScreen';
-
-// Turnos
-import AppointmentsScreen    from '../screens/shared/AppointmentsScreen';
+import PatientsScreen       from '../screens/shared/PatientsScreen';
+import PatientDetailScreen  from '../screens/shared/PatientDetailScreen';
+import PatientFormScreen    from '../screens/shared/PatientFormScreen';
+import AppointmentsScreen   from '../screens/shared/AppointmentsScreen';
 import AppointmentFormScreen from '../screens/shared/AppointmentFormScreen';
 
 const Stack = createNativeStackNavigator();
 
-const headerOptions = {
-  headerStyle: { backgroundColor: Colors.primary },
+const headerOpts = {
+  headerStyle:     { backgroundColor: Colors.primary },
   headerTintColor: Colors.white,
-  headerTitleStyle: { fontWeight: '700' },
+  headerTitleStyle:{ fontWeight: '700' },
 };
 
 function LoadingScreen() {
@@ -54,17 +56,19 @@ function LoadingScreen() {
   );
 }
 
-// ─── Pantallas comunes a todos los roles ──────────────────────────────────────
-function sharedScreens() {
+// Pantallas compartidas entre todos los roles
+function SharedScreens() {
   return (
     <>
       <Stack.Screen name="Profile"          component={ProfileScreen}         options={{ title: 'Mi perfil' }} />
       <Stack.Screen name="ChangePassword"   component={ChangePasswordScreen}  options={{ title: 'Cambiar contraseña' }} />
       <Stack.Screen name="Patients"         component={PatientsScreen}        options={{ title: 'Pacientes' }} />
       <Stack.Screen name="PatientDetail"    component={PatientDetailScreen}   options={{ title: 'Paciente' }} />
-      <Stack.Screen name="PatientForm"      component={PatientFormScreen}     options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar paciente' : 'Nuevo paciente' })} />
+      <Stack.Screen name="PatientForm"      component={PatientFormScreen}
+        options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar paciente' : 'Nuevo paciente' })} />
       <Stack.Screen name="Agenda"           component={AppointmentsScreen}    options={{ title: 'Agenda' }} />
-      <Stack.Screen name="AppointmentForm"  component={AppointmentFormScreen} options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar turno' : 'Nuevo turno' })} />
+      <Stack.Screen name="AppointmentForm"  component={AppointmentFormScreen}
+        options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar turno' : 'Nuevo turno' })} />
       <Stack.Screen name="Help"             component={PlaceholderScreen}     options={{ title: 'Ayuda' }} />
     </>
   );
@@ -74,51 +78,59 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login"      component={LoginScreen} />
-      <Stack.Screen name="TwoFA"      component={TwoFAScreen}      options={{ headerShown: true, ...headerOptions, title: 'Verificación' }} />
-      <Stack.Screen name="OAuthLogin" component={OAuthLoginScreen} options={{ headerShown: true, ...headerOptions, title: 'Iniciando sesión' }} />
+      <Stack.Screen name="TwoFA"      component={TwoFAScreen}      options={{ headerShown: true, ...headerOpts, title: 'Verificación' }} />
+      <Stack.Screen name="OAuthLogin" component={OAuthLoginScreen} options={{ headerShown: true, ...headerOpts, title: 'Iniciando sesión' }} />
     </Stack.Navigator>
   );
 }
 
 function AdminStack() {
   return (
-    <Stack.Navigator screenOptions={headerOptions}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="AdminHome"  component={AdminHomeScreen}  options={{ title: 'DENTALIS' }} />
       <Stack.Screen name="UsersList"  component={UsersListScreen}  options={{ title: 'Usuarios' }} />
       <Stack.Screen name="CreateUser" component={CreateUserScreen} options={{ title: 'Nuevo usuario' }} />
       <Stack.Screen name="EditUser"   component={EditUserScreen}   options={{ title: 'Editar usuario' }} />
-      <Stack.Screen name="Reports"    component={PlaceholderScreen} options={{ title: 'Reportes' }} />
-      {sharedScreens()}
+      <Stack.Screen name="Reports"    component={ReportsScreen}    options={{ title: 'Reportes' }} />
+      {/* Tratamientos (solo lectura para admin) */}
+      <Stack.Screen name="Treatments"    component={TreatmentsScreen}   options={{ title: 'Tratamientos' }} />
+      <Stack.Screen name="TreatmentForm" component={TreatmentFormScreen}
+        options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar tratamiento' : 'Nuevo tratamiento' })} />
+      {SharedScreens()}
     </Stack.Navigator>
   );
 }
 
 function RecepcionStack() {
   return (
-    <Stack.Navigator screenOptions={headerOptions}>
-      <Stack.Screen name="RecepcionHome"  component={RecepcionHomeScreen} options={{ title: 'DENTALIS' }} />
-      <Stack.Screen name="NewPatient"     component={PatientFormScreen}   options={{ title: 'Nuevo paciente' }} />
+    <Stack.Navigator screenOptions={headerOpts}>
+      <Stack.Screen name="RecepcionHome"  component={RecepcionHomeScreen}  options={{ title: 'DENTALIS' }} />
+      <Stack.Screen name="NewPatient"     component={PatientFormScreen}    options={{ title: 'Nuevo paciente' }} />
       <Stack.Screen name="NewAppointment" component={AppointmentFormScreen} options={{ title: 'Nuevo turno' }} />
-      <Stack.Screen name="Payments"       component={PlaceholderScreen}   options={{ title: 'Pagos' }} />
-      {sharedScreens()}
+      <Stack.Screen name="Payments"       component={PaymentsScreen}       options={{ title: 'Pagos y cuentas' }} />
+      <Stack.Screen name="NewPayment"     component={NewPaymentScreen}     options={{ title: 'Registrar pago' }} />
+      <Stack.Screen name="PaymentDetail"  component={PlaceholderScreen}    options={{ title: 'Detalle de cuenta' }} />
+      {SharedScreens()}
     </Stack.Navigator>
   );
 }
 
 function OdontologoStack() {
   return (
-    <Stack.Navigator screenOptions={headerOptions}>
-      <Stack.Screen name="OdontologoHome"  component={OdontologoHomeScreen} options={{ title: 'DENTALIS' }} />
-      <Stack.Screen name="ClinicalRecords" component={PlaceholderScreen}    options={{ title: 'Fichas clínicas' }} />
-      <Stack.Screen name="Treatments"      component={PlaceholderScreen}    options={{ title: 'Tratamientos' }} />
-      {sharedScreens()}
+    <Stack.Navigator screenOptions={headerOpts}>
+      <Stack.Screen name="OdontologoHome"   component={OdontologoHomeScreen} options={{ title: 'DENTALIS' }} />
+      <Stack.Screen name="Treatments"       component={TreatmentsScreen}     options={{ title: 'Tratamientos' }} />
+      <Stack.Screen name="TreatmentForm"    component={TreatmentFormScreen}
+        options={({ route }) => ({ title: route.params?.mode === 'edit' ? 'Editar tratamiento' : 'Nuevo tratamiento' })} />
+      <Stack.Screen name="ClinicalRecords"  component={ClinicalRecordScreen} options={{ title: 'Ficha clínica' }} />
+      <Stack.Screen name="ClinicalRecordEdit" component={PlaceholderScreen}  options={{ title: 'Editar antecedentes' }} />
+      {SharedScreens()}
     </Stack.Navigator>
   );
 }
 
 export default function AppNavigator() {
   const { isLoading, isAuthenticated, user } = useAuth();
-
   if (isLoading) return <LoadingScreen />;
 
   return (

@@ -97,7 +97,7 @@ npm install
 
 ### 2. Configuración de la URL de la API
 
-Editá `src/services/api.js` y cambiá `BASE_URL` según tu entorno:
+Configurá `EXPO_PUBLIC_API_URL` en `frontend/.env` (podés partir de `frontend/.env.example`):
 
 | Entorno | URL |
 |---|---|
@@ -107,7 +107,17 @@ Editá `src/services/api.js` y cambiá `BASE_URL` según tu entorno:
 
 Para encontrar tu IP local en Windows: ejecutá `ipconfig` en la terminal.
 
-### 3. Ejecutar
+La APK solo podrá conectarse si esta URL apunta a un servidor backend encendido y accesible desde el teléfono. Una IP local sirve únicamente mientras el Samsung y la computadora estén conectados a la misma red Wi-Fi.
+
+### 3. Configuración de inicio de sesión social
+
+El backend intercambia el código OAuth y valida la identidad con el proveedor. Configurá en `backend/.env` los IDs y secretos de Google y GitHub, y también `FACEBOOK_APP_ID` y `FACEBOOK_APP_SECRET` para Meta. El `client ID` de cada proveedor debe coincidir con el `EXPO_PUBLIC_*_CLIENT_ID` o `EXPO_PUBLIC_FACEBOOK_APP_ID` incluido al crear la app.
+
+Agregá `com.dentalis.app://oauth` como URI de retorno permitida donde corresponda en la configuración OAuth de cada proveedor y mantené el mismo valor en `OAUTH_REDIRECT_URI`. Para Google, la configuración del cliente debe admitir el flujo de app Android y su esquema de retorno. GitHub debe permitir el callback de la aplicación. En Meta, habilitá el inicio de sesión y el permiso `email`.
+
+Las credenciales OAuth privadas permanecen en el backend; no copies los secretos al frontend ni al APK.
+
+### 4. Ejecutar
 
 ```bash
 npm run android    # Lanzar en emulador Android

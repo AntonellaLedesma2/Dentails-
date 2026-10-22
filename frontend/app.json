@@ -7,13 +7,14 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "dentalis",
+    "scheme": "com.dentalis.app",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dentalis.app"
     },
     "android": {
       "package": "com.dentalis.app",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -27,6 +28,11 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4ed943c3-d588-4ca1-9904-d2f8cf8748f9"
+      }
+    }
   }
 }

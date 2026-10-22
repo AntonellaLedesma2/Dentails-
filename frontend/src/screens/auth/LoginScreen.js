@@ -32,7 +32,9 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate('TwoFA', { userId: result.userId });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Credenciales incorrectas';
+      const msg = err.response?.data?.message || (err.response
+        ? 'No se pudo completar el inicio de sesión.'
+        : 'No se pudo conectar con el servidor. Verificá que el backend siga iniciado.');
       Alert.alert('Error al iniciar sesión', msg);
     } finally {
       setLoading(false);
@@ -42,9 +44,14 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      >
 
         {/* Header */}
         <View style={styles.header}>
@@ -104,7 +111,7 @@ export default function LoginScreen({ navigation }) {
           {[
             { provider: 'google',   label: 'Google',   icon: 'G'  },
             { provider: 'github',   label: 'GitHub',   icon: '🐙' },
-            { provider: 'facebook', label: 'Discord',  icon: '🎮' },
+            { provider: 'facebook', label: 'Facebook', icon: 'f' },
           ].map(({ provider, label, icon }) => (
             <TouchableOpacity
               key={provider}

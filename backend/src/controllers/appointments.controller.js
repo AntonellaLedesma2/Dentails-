@@ -28,7 +28,7 @@ async function getAppointmentById(req, res, next) {
     if (!appt) return res.status(404).json({ error: true, message: 'Turno no encontrado' });
 
     // Odontólogo solo puede ver sus propios turnos
-    if (req.user.rol === 'odontologo' && appt.odontologo_id !== req.user.id) {
+    if (req.user.rol === 'odontologo' && Number(appt.odontologo_id) !== Number(req.user.id)) {
       return res.status(403).json({ error: true, message: 'Sin permiso para ver este turno' });
     }
     return res.status(200).json({ appointment: appt });
@@ -63,7 +63,20 @@ async function createAppointment(req, res, next) {
 async function updateAppointment(req, res, next) {
   try {
     const { id } = req.params;
-    const updated = await AppointmentModel.update(id, req.body);
+    const { estado, ...appointmentData } = req.body;
+    if (estado !== undefined) {
+      const validEstados = ['pendiente', 'confirmado', 'cancelado', 'reprogramado', 'realizado'];
+      if (!validEstados.includes(estado)) {
+        return res.status(422).json({ error: true, message: 'Estado inválido' });
+      }
+      if (req.user.rol === 'recepcion' && estado === 'realizado') {
+        return res.status(403).json({ error: true, message: 'Recepción no puede marcar un turno como realizado' });
+      }
+    }
+    const updated = await AppointmentModel.update(id, appointmentData);
+    if (updated && estado !== undefined) {
+      await AppointmentModel.setEstado(id, estado);
+    }
     if (!updated) return res.status(404).json({ error: true, message: 'Turno no encontrado' });
 
     await logActivity({
@@ -87,6 +100,19 @@ async function changeEstado(req, res, next) {
     const validEstados = ['pendiente', 'confirmado', 'cancelado', 'realizado', 'reprogramado'];
     if (!validEstados.includes(estado)) {
       return res.status(422).json({ error: true, message: 'Estado inválido' });
+    }
+
+    if (req.user.rol === 'recepcion' && estado === 'realizado') {
+      return res.status(403).json({ error: true, message: 'Recepción no puede marcar un turno como realizado' });
+    }
+    if (req.user.rol === 'odontologo' && estado !== 'realizado') {
+      return res.status(403).json({ error: true, message: 'El odontólogo solo puede marcar turnos como realizados' });
+    }
+
+    const appointment = await AppointmentModel.findById(id);
+    if (!appointment) return res.status(404).json({ error: true, message: 'Turno no encontrado' });
+    if (req.user.rol === 'odontologo' && Number(appointment.odontologo_id) !== Number(req.user.id)) {
+      return res.status(403).json({ error: true, message: 'Solo podés actualizar turnos de tu propia agenda' });
     }
 
     const updated = await AppointmentModel.setEstado(id, estado);

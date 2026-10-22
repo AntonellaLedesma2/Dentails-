@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   correo        VARCHAR(150) NOT NULL UNIQUE,
   username      VARCHAR(80) UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  rol           ENUM('administrador', 'recepcion', 'odontologo') NOT NULL DEFAULT 'recepcion',
+  rol           ENUM('administrador', 'recepcion', 'odontologo', 'usuario') NOT NULL DEFAULT 'recepcion',
   estado        ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
   -- OAuth
   google_id     VARCHAR(255) UNIQUE,
@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+-- Mantener el rol usuario disponible también en bases creadas anteriormente.
+ALTER TABLE usuarios
+  MODIFY rol ENUM('administrador', 'recepcion', 'odontologo', 'usuario') NOT NULL DEFAULT 'recepcion';
 
 -- ------------------------------------------------------------
 -- Tabla: pacientes

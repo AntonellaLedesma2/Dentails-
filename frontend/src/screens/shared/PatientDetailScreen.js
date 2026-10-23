@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator,
 } from 'react-native';
 import patientService from '../../services/patientService';
+import clinicalRecordService from '../../services/clinicalRecordService';
+import Odontogram from '../../components/Odontogram';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Colors from '../../constants/colors';
@@ -34,18 +36,17 @@ export default function PatientDetailScreen({ route, navigation }) {
   const isOdonto  = user?.rol === ROLES.ODONTOLOGO;
 
   const [patient, setPatient] = useState(null);
+  const [odontograma, setOdontograma] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    load();
-    const unsub = navigation.addListener('focus', load);
-    return unsub;
-  }, [patientId]);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
-      const data = await patientService.getById(patientId);
+      const [data, clinical] = await Promise.all([
+        patientService.getById(patientId),
+        isOdonto ? clinicalRecordService.getRecord(patientId) : Promise.resolve(null),
+      ]);
       setPatient(data);
+      if (clinical) setOdontograma(clinical.odontograma || {});
       navigation.setOptions({ title: `${data.apellido}, ${data.nombre}` });
     } catch {
       Alert.alert('Error', 'No se pudo cargar el paciente');
@@ -53,7 +54,13 @@ export default function PatientDetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [patientId, isOdonto, navigation]);
+
+  useEffect(() => {
+    load();
+    const unsub = navigation.addListener('focus', load);
+    return unsub;
+  }, [load, navigation]);
 
   async function handleDeactivate() {
     Alert.alert('Desactivar paciente', '¿Estás seguro?', [
@@ -116,6 +123,13 @@ export default function PatientDetailScreen({ route, navigation }) {
             size="sm"
           />
         </View>
+      )}
+
+      {isOdonto && (
+        <Card title="Odontograma del paciente" style={styles.card}>
+          <Odontogram estados={odontograma} readOnly />
+          <Button title="Abrir ficha clínica completa" onPress={() => navigation.navigate('ClinicalRecords', { patientId })} variant="ghost" size="sm" style={{ marginTop: 10 }} />
+        </Card>
       )}
 
       {/* Datos personales */}

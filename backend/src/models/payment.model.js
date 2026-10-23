@@ -72,14 +72,17 @@ const PaymentModel = {
     const [rows] = await pool.execute(
       `SELECT p.id AS paciente_id,
               CONCAT(p.nombre,' ',p.apellido) AS paciente_nombre,
-              COUNT(pa.id)                    AS total_pagos,
-              COALESCE(SUM(pa.importe), 0)    AS total_pagado,
+              COALESCE(SUM(pay.total_pagos), 0) AS total_pagos,
+              COALESCE(SUM(pay.total_pagado), 0) AS total_pagado,
               COALESCE(SUM(tr.costo_total), 0) AS total_tratamientos,
-              COALESCE(SUM(tr.costo_total), 0) - COALESCE(SUM(pa.importe), 0) AS saldo_pendiente
+              GREATEST(COALESCE(SUM(tr.costo_total), 0) - COALESCE(SUM(pay.total_pagado), 0), 0) AS saldo_pendiente
        FROM pacientes p
        JOIN tratamientos tr ON tr.paciente_id = p.id AND tr.odontologo_id = ?
-       LEFT JOIN pagos pa ON pa.paciente_id = p.id AND pa.tratamiento_id = tr.id
-       GROUP BY p.id
+       LEFT JOIN (
+         SELECT tratamiento_id, COUNT(*) AS total_pagos, SUM(importe) AS total_pagado
+         FROM pagos GROUP BY tratamiento_id
+       ) pay ON pay.tratamiento_id = tr.id
+       GROUP BY p.id, p.nombre, p.apellido
        ORDER BY p.apellido`,
       [odontologoId]
     );
@@ -107,7 +110,54 @@ const PaymentModel = {
        ORDER BY mes ASC`
     );
 
-    return { totales, porMes };
+    const [[metricas]] = await pool.execute(
+      `SELECT
+         (SELECT COUNT(*) FROM pacientes WHERE estado = 'activo') AS pacientes,
+         (SELECT COUNT(*) FROM usuarios WHERE rol = 'odontologo' AND estado = 'activo') AS odontologos,
+         (SELECT COUNT(*) FROM usuarios WHERE estado = 'activo') AS usuarios_activos,
+         (SELECT COUNT(*) FROM turnos WHERE fecha = CURDATE() AND estado <> 'cancelado') AS turnos_hoy,
+         (SELECT COUNT(*) FROM turnos WHERE YEAR(fecha) = YEAR(CURDATE()) AND MONTH(fecha) = MONTH(CURDATE())) AS turnos_mes,
+         (SELECT COUNT(*) FROM turnos WHERE fecha >= CURDATE() AND estado IN ('pendiente','confirmado')) AS proximos_turnos,
+         (SELECT COUNT(*) FROM tratamientos WHERE estado IN ('planificado','en_curso')) AS tratamientos_activos`
+    );
+
+    const [turnosPorMes] = await pool.execute(
+      `SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes,
+              COUNT(*) AS total,
+              SUM(estado = 'realizado') AS realizados,
+              SUM(estado = 'cancelado') AS cancelados
+       FROM turnos
+       WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH) AND fecha <= CURDATE()
+       GROUP BY mes ORDER BY mes`
+    );
+
+    const [estadosTurno] = await pool.execute(
+      `SELECT estado, COUNT(*) AS total FROM turnos
+       WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) AND fecha <= CURDATE() GROUP BY estado`
+    );
+
+    const [proximosTurnos] = await pool.execute(
+      `SELECT t.id, t.fecha, t.hora, t.estado, t.motivo,
+              CONCAT(p.nombre, ' ', p.apellido) AS paciente_nombre,
+              CONCAT(u.nombre, ' ', u.apellido) AS odontologo_nombre
+       FROM turnos t JOIN pacientes p ON p.id = t.paciente_id
+       JOIN usuarios u ON u.id = t.odontologo_id
+       WHERE t.fecha >= CURDATE() AND t.estado IN ('pendiente','confirmado')
+       ORDER BY t.fecha, t.hora LIMIT 6`
+    );
+
+    const [topTratamientos] = await pool.execute(
+      `SELECT descripcion AS nombre, COUNT(*) AS cantidad, COALESCE(SUM(costo_total), 0) AS valor
+       FROM tratamientos GROUP BY descripcion ORDER BY cantidad DESC LIMIT 5`
+    );
+
+    const [porMetodo] = await pool.execute(
+      `SELECT metodo, COUNT(*) AS cantidad, COALESCE(SUM(importe), 0) AS total
+       FROM pagos WHERE YEAR(fecha) = YEAR(CURDATE()) AND MONTH(fecha) = MONTH(CURDATE())
+       GROUP BY metodo ORDER BY total DESC`
+    );
+
+    return { totales, porMes, metricas, turnosPorMes, estadosTurno, proximosTurnos, topTratamientos, porMetodo };
   },
 };
 

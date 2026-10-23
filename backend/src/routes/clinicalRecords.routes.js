@@ -5,7 +5,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 router.use(authenticate);
 
-router.get('/:pacienteId',             authorize('odontologo','administrador'), getRecord);
+router.get('/:pacienteId',             authorize('odontologo'), getRecord);
 router.put('/:pacienteId',             authorize('odontologo'), updateRecord);
 router.post('/:pacienteId/consultas',  authorize('odontologo'), addConsulta);
 router.put('/:pacienteId/odontograma', authorize('odontologo'), saveOdontograma);

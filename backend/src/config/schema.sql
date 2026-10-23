@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS fichas_clinicas (
   alergias        TEXT,
   medicacion      TEXT,
   observaciones   TEXT,
+  odontograma     LONGTEXT,
   creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
@@ -119,6 +120,18 @@ CREATE TABLE IF NOT EXISTS consultas (
 -- ------------------------------------------------------------
 -- Tabla: tratamientos
 -- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS catalogo_tratamientos (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  nombre          VARCHAR(160) NOT NULL UNIQUE,
+  categoria       VARCHAR(80) NOT NULL DEFAULT 'General',
+  descripcion     VARCHAR(255),
+  precio          DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  duracion_min    INT NOT NULL DEFAULT 30,
+  activo          TINYINT(1) NOT NULL DEFAULT 1,
+  creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS tratamientos (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   paciente_id     INT NOT NULL,
@@ -175,7 +188,7 @@ VALUES (
   'DENTALIS',
   'admin@dentalis.com',
   'admin',
-  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '$2a$10$YBM0kdK4CDDFvEI8hYLCC.bHH4skZ/Q/XaIPGpzDRrhQ0owclaNC6',
   'administrador',
   'activo'
 );

@@ -9,6 +9,14 @@ const ClinicalRecordModel = {
     return rows[0] || null;
   },
 
+  async hasPatientAssignment(pacienteId, odontologoId) {
+    const [rows] = await pool.execute(
+      `SELECT 1 FROM turnos WHERE paciente_id = ? AND odontologo_id = ? LIMIT 1`,
+      [pacienteId, odontologoId]
+    );
+    return rows.length > 0;
+  },
+
   async createOrUpdate(pacienteId, { antecedentes, alergias, medicacion, observaciones }) {
     const existing = await this.findByPatient(pacienteId);
     if (existing) {
@@ -61,6 +69,7 @@ const ClinicalRecordModel = {
       [pacienteId]
     );
     if (!rows[0] || !rows[0].odontograma) return {};
+    if (typeof rows[0].odontograma === 'object') return rows[0].odontograma;
     try { return JSON.parse(rows[0].odontograma); } catch { return {}; }
   },
 

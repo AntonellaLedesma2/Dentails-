@@ -10,6 +10,7 @@ export default function Input({
   leftIcon,
   style,
   containerStyle,
+  themeColors,
   ...props
 }) {
   const [visible, setVisible] = useState(false);
@@ -17,16 +18,20 @@ export default function Input({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, themeColors?.label && { color: themeColors.label }]}>{label}</Text>}
       <View style={[
         styles.inputWrapper,
+        themeColors && {
+          backgroundColor: themeColors.inputBackground,
+          borderColor: themeColors.inputBorder,
+        },
         focused && styles.inputFocused,
         error  && styles.inputError,
       ]}>
         {leftIcon && <Text style={styles.leftIcon}>{leftIcon}</Text>}
         <TextInput
-          style={[styles.input, leftIcon && styles.inputWithIcon, style]}
-          placeholderTextColor={Colors.text.disabled}
+          style={[styles.input, themeColors?.text && { color: themeColors.text }, leftIcon && styles.inputWithIcon, style]}
+          placeholderTextColor={themeColors?.placeholder || Colors.text.disabled}
           secureTextEntry={secureTextEntry && !visible}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

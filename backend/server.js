@@ -10,6 +10,7 @@ const usersRoutes           = require('./src/routes/users.routes');
 const patientsRoutes        = require('./src/routes/patients.routes');
 const appointmentsRoutes    = require('./src/routes/appointments.routes');
 const treatmentsRoutes      = require('./src/routes/treatments.routes');
+const treatmentCatalogRoutes = require('./src/routes/treatmentCatalog.routes');
 const paymentsRoutes        = require('./src/routes/payments.routes');
 const clinicalRecordsRoutes = require('./src/routes/clinicalRecords.routes');
 const { errorHandler, notFound } = require('./src/middlewares/error.middleware');
@@ -41,6 +42,7 @@ app.use('/api/users',            usersRoutes);
 app.use('/api/patients',         patientsRoutes);
 app.use('/api/appointments',     appointmentsRoutes);
 app.use('/api/treatments',       treatmentsRoutes);
+app.use('/api/treatment-catalog', treatmentCatalogRoutes);
 app.use('/api/payments',         paymentsRoutes);
 app.use('/api/clinical-records', clinicalRecordsRoutes);
 

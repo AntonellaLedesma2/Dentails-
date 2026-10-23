@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, useWindowDimensions,
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import appointmentService from '../../services/appointmentService';
@@ -18,7 +18,7 @@ function buildWeekDays() {
     d.setDate(today.getDate() + i);
     days.push({
       label: d.toLocaleDateString('es-AR', { weekday: 'short' }),
-      date:  d.toISOString().substring(0, 10),
+      date:  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
       day:   d.getDate(),
     });
   }
@@ -31,6 +31,8 @@ function formatHora(hora) {
 
 export default function AppointmentsScreen({ navigation }) {
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
+  const showBoard = width >= 1050 && user?.rol !== ROLES.ODONTOLOGO;
   const canCreate = user?.rol === ROLES.ADMINISTRADOR || user?.rol === ROLES.RECEPCION;
 
   const weekDays  = buildWeekDays();
@@ -40,6 +42,14 @@ export default function AppointmentsScreen({ navigation }) {
   const [appointments, setAppointments]   = useState([]);
   const [loading, setLoading]             = useState(true);
   const [refreshing, setRefreshing]       = useState(false);
+
+  const doctorColumns = [...new Map(appointments.map((item) => [String(item.odontologo_id), {
+    id: item.odontologo_id,
+    name: item.odontologo_nombre || 'Odontólogo',
+  }])).values()].map((doctor) => ({
+    ...doctor,
+    appointments: appointments.filter((item) => String(item.odontologo_id) === String(doctor.id)),
+  }));
 
   const fetchAppointments = useCallback(async (date = selectedDate) => {
     try {
@@ -150,6 +160,20 @@ export default function AppointmentsScreen({ navigation }) {
     );
   }
 
+  function renderBoardAppointment(item) {
+    const stateColor = item.estado === 'confirmado' ? '#21845F' : item.estado === 'cancelado' ? '#C96870' : '#B67A1A';
+    return (
+      <TouchableOpacity key={item.id} style={[styles.boardAppointment, item.estado === 'realizado' && styles.boardDone]} activeOpacity={0.8}
+        onPress={canCreate ? () => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id }) : () => navigation.navigate('PatientDetail', { patientId: item.paciente_id })}>
+        <View style={styles.boardTime}><Text style={styles.boardTimeText}>{formatHora(item.hora)}</Text></View>
+        <Text style={styles.boardPatient} numberOfLines={1}>{item.paciente_nombre}</Text>
+        <Text style={styles.boardReason} numberOfLines={2}>{item.motivo || 'Consulta odontológica'}</Text>
+        <View style={styles.boardFoot}><Text style={[styles.boardStatus, { color: stateColor }]}>{item.estado}</Text><Text style={styles.boardDuration}>{item.duracion_min} min</Text></View>
+        {canCreate && item.estado === 'pendiente' && <TouchableOpacity style={styles.boardConfirm} onPress={async () => { await appointmentService.changeEstado(item.id, 'confirmado'); fetchAppointments(selectedDate); }}><Text style={styles.boardConfirmText}>Confirmar</Text></TouchableOpacity>}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={styles.container}>
 
@@ -182,6 +206,16 @@ export default function AppointmentsScreen({ navigation }) {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
+      ) : showBoard ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.board}>
+          {doctorColumns.length ? doctorColumns.map((doctor) => (
+            <View key={doctor.id} style={styles.doctorColumn}>
+              <View style={styles.doctorColumnHeader}><View style={styles.doctorAvatar}><Text style={styles.doctorAvatarText}>{doctor.name[0]}</Text></View><View style={{ flex: 1 }}><Text style={styles.doctorColumnName} numberOfLines={1}>Dr/a. {doctor.name}</Text><Text style={styles.doctorColumnMeta}>{doctor.appointments.length} turnos</Text></View></View>
+              {doctor.appointments.map(renderBoardAppointment)}
+              {!doctor.appointments.length && <Text style={styles.boardEmpty}>Agenda libre</Text>}
+            </View>
+          )) : <View style={styles.empty}><Text style={styles.emptyIcon}>📅</Text><Text style={styles.emptyTitle}>Sin turnos para este día</Text></View>}
+        </ScrollView>
       ) : (
         <FlatList
           data={appointments}
@@ -254,6 +288,14 @@ const styles = StyleSheet.create({
   },
 
   list: { paddingHorizontal: 16, paddingBottom: 90 },
+  board: { paddingHorizontal: 14, paddingBottom: 30, gap: 12, alignItems: 'flex-start' },
+  doctorColumn: { width: 245, minHeight: 370, backgroundColor: '#EDF2F9', borderRadius: 12, padding: 9 },
+  doctorColumnHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 6, paddingBottom: 10 },
+  doctorAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#DFE9FA', justifyContent: 'center', alignItems: 'center' },
+  doctorAvatarText: { color: '#3569D3', fontSize: 11, fontWeight: '800' }, doctorColumnName: { color: '#36455F', fontSize: 10, fontWeight: '800' }, doctorColumnMeta: { color: '#8B98AC', fontSize: 8, marginTop: 3 },
+  boardAppointment: { backgroundColor: '#FFFFFF', borderRadius: 9, padding: 11, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: '#4A78D4', borderWidth: 1, borderColor: '#E6EBF3' },
+  boardDone: { borderLeftColor: '#28A478' }, boardTime: { alignSelf: 'flex-start', backgroundColor: '#EDF3FE', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 4, marginBottom: 7 }, boardTimeText: { color: '#3D6BCB', fontSize: 9, fontWeight: '800' },
+  boardPatient: { color: '#394962', fontSize: 10, fontWeight: '800' }, boardReason: { color: '#8794A8', fontSize: 8, lineHeight: 12, marginTop: 4 }, boardFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }, boardStatus: { fontSize: 8, fontWeight: '800', textTransform: 'capitalize' }, boardDuration: { color: '#A0AABB', fontSize: 8 }, boardConfirm: { alignSelf: 'flex-end', marginTop: 8, borderRadius: 5, backgroundColor: '#E7F7F0', paddingHorizontal: 8, paddingVertical: 5 }, boardConfirmText: { color: '#21845F', fontSize: 8, fontWeight: '800' }, boardEmpty: { color: '#97A2B3', textAlign: 'center', fontSize: 9, paddingTop: 25 },
 
   card: {
     flexDirection: 'row',

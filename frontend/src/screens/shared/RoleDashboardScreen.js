@@ -14,11 +14,14 @@ const CONFIG = {
     greeting: 'Panel de administración',
     subtitle: 'Organizá la clínica y controlá la operación general.',
     actions: [
+      { label: 'Reservaciones', detail: 'Agenda de la clínica', icon: '▣', route: 'Agenda', tone: 'green' },
+      { label: 'Odontólogos', detail: 'Equipo y carga de atención', icon: '♙', route: 'Dentists', tone: 'violet' },
+      { label: 'Cuentas y ventas', detail: 'Actividad financiera', icon: '$', route: 'Sales', tone: 'amber' },
       { label: 'Gestionar usuarios', detail: 'Cuentas y roles', icon: '♙', route: 'UsersList', tone: 'blue' },
-      { label: 'Agenda general', detail: 'Todos los turnos', icon: '▣', route: 'Agenda', tone: 'green' },
       { label: 'Pacientes', detail: 'Datos administrativos', icon: '◉', route: 'Patients', tone: 'violet' },
       { label: 'Reportes', detail: 'Indicadores de gestión', icon: '▥', route: 'Reports', tone: 'amber' },
-      { label: 'Tratamientos', detail: 'Catálogo y precios', icon: '◇', route: 'Treatments', tone: 'rose' },
+      { label: 'Tratamientos', detail: 'Catálogo y precios', icon: '◇', route: 'TreatmentCatalog', tone: 'rose' },
+      { label: 'Métodos de pago', detail: 'Cobros de la clínica', icon: '▤', route: 'PaymentMethods', tone: 'blue' },
     ],
   },
   [ROLES.RECEPCION]: {

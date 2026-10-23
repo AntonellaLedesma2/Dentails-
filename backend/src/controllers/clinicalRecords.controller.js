@@ -4,6 +4,9 @@ const { logActivity } = require('../utils/activityLogger');
 async function getRecord(req, res, next) {
   try {
     const { pacienteId } = req.params;
+    if (req.user.rol !== 'odontologo' || !(await ClinicalRecordModel.hasPatientAssignment(pacienteId, req.user.id))) {
+      return res.status(403).json({ error: true, message: 'Solo podés acceder a fichas de pacientes de tu agenda' });
+    }
     let record = await ClinicalRecordModel.findByPatient(pacienteId);
     if (!record) {
       // Crear ficha vacía automáticamente
@@ -19,6 +22,9 @@ async function getRecord(req, res, next) {
 async function updateRecord(req, res, next) {
   try {
     const { pacienteId } = req.params;
+    if (!(await ClinicalRecordModel.hasPatientAssignment(pacienteId, req.user.id))) {
+      return res.status(403).json({ error: true, message: 'Solo podés editar fichas de pacientes de tu agenda' });
+    }
     await ClinicalRecordModel.createOrUpdate(pacienteId, req.body);
     await logActivity({ usuarioId: req.user.id, accion: 'EDITAR_FICHA', entidad: 'fichas_clinicas', ip: req.ip });
     return res.status(200).json({ message: 'Ficha actualizada' });
@@ -28,6 +34,9 @@ async function updateRecord(req, res, next) {
 async function addConsulta(req, res, next) {
   try {
     const { pacienteId } = req.params;
+    if (!(await ClinicalRecordModel.hasPatientAssignment(pacienteId, req.user.id))) {
+      return res.status(403).json({ error: true, message: 'Solo podés registrar consultas de pacientes de tu agenda' });
+    }
     let record = await ClinicalRecordModel.findByPatient(pacienteId);
     if (!record) {
       await ClinicalRecordModel.createOrUpdate(pacienteId, {});
@@ -43,6 +52,9 @@ async function addConsulta(req, res, next) {
 async function saveOdontograma(req, res, next) {
   try {
     const { pacienteId } = req.params;
+    if (!(await ClinicalRecordModel.hasPatientAssignment(pacienteId, req.user.id))) {
+      return res.status(403).json({ error: true, message: 'Solo podés editar odontogramas de pacientes de tu agenda' });
+    }
     const { odontograma } = req.body;
     // Asegurar que existe la ficha
     let record = await ClinicalRecordModel.findByPatient(pacienteId);

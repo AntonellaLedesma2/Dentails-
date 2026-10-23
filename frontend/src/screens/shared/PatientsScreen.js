@@ -15,7 +15,7 @@ function calcAge(fechaNacimiento) {
   return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-export default function PatientsScreen({ navigation }) {
+export default function PatientsScreen({ navigation, clinicalMode = false }) {
   const { user } = useAuth();
   const canEdit = user?.rol === ROLES.ADMINISTRADOR || user?.rol === ROLES.RECEPCION;
 
@@ -63,7 +63,7 @@ export default function PatientsScreen({ navigation }) {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('PatientDetail', { patientId: item.id })}
+        onPress={() => navigation.navigate(clinicalMode ? 'ClinicalRecords' : 'PatientDetail', { patientId: item.id })}
         accessibilityRole="button"
       >
         <View style={styles.cardLeft}>

@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import treatmentService from '../../services/treatmentService';
+import treatmentCatalogService from '../../services/treatmentCatalogService';
 import patientService   from '../../services/patientService';
 import userService      from '../../services/userService';
 import Button  from '../../components/Button';
@@ -28,6 +29,7 @@ export default function TreatmentFormScreen({ route, navigation }) {
     estado: 'planificado',
   });
   const [patients, setPatients] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -36,6 +38,7 @@ export default function TreatmentFormScreen({ route, navigation }) {
       try {
         const pats = await patientService.getAll();
         setPatients(pats);
+        setCatalog(await treatmentCatalogService.getAll().catch(() => []));
         if (isEdit) {
           const t = await treatmentService.getById(treatmentId);
           setForm({
@@ -119,6 +122,18 @@ export default function TreatmentFormScreen({ route, navigation }) {
 
         <Text style={styles.sectionLabel}>TRATAMIENTO</Text>
         <View style={styles.section}>
+          {!isEdit && catalog.length > 0 && (
+            <>
+              <Text style={styles.catalogHint}>Elegí una prestación para completar descripción y precio sugerido.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {catalog.map((item) => (
+                  <TouchableOpacity key={item.id} style={[styles.chip, form.descripcion === item.nombre && styles.chipActive]} onPress={() => setForm((f) => ({ ...f, descripcion: item.nombre, costoTotal: String(item.precio) }))}>
+                    <Text style={[styles.chipText, form.descripcion === item.nombre && styles.chipTextActive]}>{item.nombre} · Gs. {Number(item.precio).toLocaleString('es-PY')}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
           <Input
             label="Descripción *"
             value={form.descripcion}
@@ -126,11 +141,11 @@ export default function TreatmentFormScreen({ route, navigation }) {
             placeholder="Ej: Extracción pieza 14, Limpieza, Ortodoncia..."
           />
           <Input
-            label="Costo total ($)"
+            label="Costo total (Gs.)"
             value={form.costoTotal}
             onChangeText={(v) => set('costoTotal', v)}
             keyboardType="decimal-pad"
-            placeholder="0.00"
+            placeholder="0"
             leftIcon="💲"
           />
           <Input
@@ -184,6 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card, borderRadius: 12, padding: 16,
     borderWidth: 1, borderColor: Colors.cardBorder,
   },
+  catalogHint: { color: Colors.text.secondary, fontSize: 11, marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,

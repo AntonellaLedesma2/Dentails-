@@ -19,10 +19,11 @@ const METODOS = [
 ];
 
 export default function NewPaymentScreen({ route, navigation }) {
-  const { odontologoId, pacienteIdDefault } = route.params || {};
+  const { odontologoId, pacienteIdDefault, pacienteId } = route.params || {};
+  const selectedPatientId = pacienteIdDefault || pacienteId;
 
   const [form, setForm]         = useState({
-    pacienteId:    pacienteIdDefault ? String(pacienteIdDefault) : '',
+    pacienteId:    selectedPatientId ? String(selectedPatientId) : '',
     tratamientoId: '',
     importe:       '',
     metodo:        'efectivo',
@@ -38,9 +39,9 @@ export default function NewPaymentScreen({ route, navigation }) {
       try {
         const pats = await patientService.getAll();
         setPatients(pats);
-        if (pacienteIdDefault) {
+        if (selectedPatientId) {
           const treats = await treatmentService.getAll({
-            paciente_id:   pacienteIdDefault,
+            paciente_id:   selectedPatientId,
             odontologo_id: odontologoId,
           });
           setTreatments(treats);

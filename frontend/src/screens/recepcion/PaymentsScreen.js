@@ -42,7 +42,7 @@ export default function PaymentsScreen({ navigation }) {
   }, [selected]);
 
   function formatCurrency(val) {
-    return `$${parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  return `Gs. ${Number(val || 0).toLocaleString('es-PY')}`;
   }
 
   const selectedOdontologo = odontologos.find((o) => o.odontologo_id === selected);

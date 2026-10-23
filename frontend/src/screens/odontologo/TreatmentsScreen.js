@@ -4,6 +4,7 @@ import {
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import treatmentService from '../../services/treatmentService';
+import treatmentCatalogService from '../../services/treatmentCatalogService';
 import StatusBadge from '../../components/StatusBadge';
 import Card from '../../components/Card';
 import Colors from '../../constants/colors';
@@ -26,14 +27,18 @@ export default function TreatmentsScreen({ route, navigation }) {
   const patientId = route?.params?.patientId || null;
 
   const [treatments, setTreatments] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetch = useCallback(async () => {
     try {
       const params = patientId ? { paciente_id: patientId } : {};
-      const data = await treatmentService.getAll(params);
+      const [data, prices] = await Promise.all([
+        treatmentService.getAll(params), treatmentCatalogService.getAll(),
+      ]);
       setTreatments(data);
+      setCatalog(prices);
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'No se pudo cargar');
     } finally {
@@ -69,9 +74,7 @@ export default function TreatmentsScreen({ route, navigation }) {
         {item.costo_total !== null && (
           <View style={styles.costoRow}>
             <Text style={styles.costoLabel}>Costo total</Text>
-            <Text style={styles.costoValue}>
-              ${parseFloat(item.costo_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-            </Text>
+            <Text style={styles.costoValue}>Gs. {Number(item.costo_total).toLocaleString('es-PY')}</Text>
           </View>
         )}
         {item.notas && <Text style={styles.notas}>{item.notas}</Text>}
@@ -91,6 +94,22 @@ export default function TreatmentsScreen({ route, navigation }) {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} tintColor={Colors.primary} />
         }
+        ListHeaderComponent={(
+          <View style={styles.catalogPanel}>
+            <View style={styles.catalogHeader}>
+              <View><Text style={styles.catalogEyebrow}>ARANCELARIO DE LA CLÍNICA</Text><Text style={styles.catalogTitle}>Tratamientos y precios</Text></View>
+              <Text style={styles.catalogMark}>◇</Text>
+            </View>
+            {catalog.slice(0, 8).map((item) => (
+              <View key={item.id} style={styles.priceRow}>
+                <View style={styles.priceCopy}><Text style={styles.priceName}>{item.nombre}</Text><Text style={styles.priceCategory}>{item.categoria} · {item.duracion_min} min</Text></View>
+                <Text style={styles.catalogPrice}>Gs. {Number(item.precio).toLocaleString('es-PY')}</Text>
+              </View>
+            ))}
+            {!catalog.length && <Text style={styles.catalogEmpty}>El administrador todavía no cargó precios de referencia.</Text>}
+            <Text style={styles.plansHeading}>{patientId ? 'PLANES DE ESTE PACIENTE' : 'PLANES DE TRATAMIENTO'}</Text>
+          </View>
+        )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>💊</Text>
@@ -112,6 +131,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 16, paddingBottom: 90 },
+  catalogPanel: { backgroundColor: '#fff', borderColor: '#E8EDF4', borderWidth: 1, borderRadius: 13, padding: 15, marginBottom: 14 },
+  catalogHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  catalogEyebrow: { color: '#8592A7', fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  catalogTitle: { color: '#2C3C59', fontSize: 14, fontWeight: '800', marginTop: 4 },
+  catalogMark: { color: '#3C6BCF', fontSize: 25, fontWeight: '700' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: '#EEF1F5', paddingVertical: 9 },
+  priceCopy: { flex: 1 }, priceName: { color: '#45546E', fontSize: 10, fontWeight: '700' },
+  priceCategory: { color: '#919DB0', fontSize: 8, marginTop: 3 },
+  catalogPrice: { color: '#25835F', fontSize: 10, fontWeight: '800' },
+  catalogEmpty: { color: '#8492A6', fontSize: 10, paddingVertical: 12 },
+  plansHeading: { color: '#8190A5', fontSize: 8, fontWeight: '800', letterSpacing: 1, borderTopWidth: 1, borderTopColor: '#EEF1F5', paddingTop: 10, marginTop: 2 },
   card: {
     backgroundColor: Colors.card,
     borderRadius: 12,

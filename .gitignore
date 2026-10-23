@@ -11,6 +11,8 @@ backend/.env
 # Expo
 frontend/.expo/
 frontend/dist/
+frontend/.expo-android-preview/
+frontend/.expo-ios-preview/
 frontend/web-build/
 frontend/expo-env.d.ts
 

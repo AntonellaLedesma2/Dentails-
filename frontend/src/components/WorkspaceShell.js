@@ -8,12 +8,16 @@ import Colors from '../constants/colors';
 
 const MENUS = {
   [ROLES.ADMINISTRADOR]: [
-    { section: 'CLÍNICA', label: 'Resumen', icon: '▦', route: 'AdminHome' },
-    { section: 'CLÍNICA', label: 'Agenda general', icon: '▣', route: 'Agenda' },
+    { section: 'CLÍNICA', label: 'Dashboard', icon: '▦', route: 'AdminHome' },
+    { section: 'CLÍNICA', label: 'Reservaciones', icon: '▣', route: 'Agenda' },
     { section: 'CLÍNICA', label: 'Pacientes', icon: '◉', route: 'Patients' },
-    { section: 'GESTIÓN', label: 'Usuarios y roles', icon: '♙', route: 'UsersList' },
-    { section: 'GESTIÓN', label: 'Tratamientos y precios', icon: '◇', route: 'Treatments' },
-    { section: 'GESTIÓN', label: 'Reportes', icon: '▥', route: 'Reports' },
+    { section: 'CLÍNICA', label: 'Tratamientos', icon: '◇', route: 'TreatmentCatalog' },
+    { section: 'CLÍNICA', label: 'Odontólogos', icon: '♙', route: 'Dentists' },
+    { section: 'FINANZAS', label: 'Cuentas', icon: '$', route: 'Payments' },
+    { section: 'FINANZAS', label: 'Ventas', icon: '↗', route: 'Sales' },
+    { section: 'FINANZAS', label: 'Métodos de pago', icon: '▤', route: 'PaymentMethods' },
+    { section: 'FINANZAS', label: 'Reportes', icon: '▥', route: 'Reports' },
+    { section: 'GESTIÓN', label: 'Usuarios', icon: '♙', route: 'UsersList' },
     { section: 'CUENTA', label: 'Mi perfil', icon: '○', route: 'Profile' },
   ],
   [ROLES.RECEPCION]: [
@@ -27,7 +31,7 @@ const MENUS = {
     { section: 'ATENCIÓN CLÍNICA', label: 'Resumen', icon: '▦', route: 'OdontologoHome' },
     { section: 'ATENCIÓN CLÍNICA', label: 'Mi agenda', icon: '▣', route: 'Agenda' },
     { section: 'ATENCIÓN CLÍNICA', label: 'Mis pacientes', icon: '◉', route: 'Patients' },
-    { section: 'ATENCIÓN CLÍNICA', label: 'Fichas clínicas', icon: '▤', route: 'ClinicalRecords' },
+    { section: 'ATENCIÓN CLÍNICA', label: 'Fichas clínicas', icon: '▤', route: 'ClinicalRecordsList' },
     { section: 'ATENCIÓN CLÍNICA', label: 'Tratamientos', icon: '◇', route: 'Treatments' },
     { section: 'CUENTA', label: 'Mi perfil', icon: '○', route: 'Profile' },
   ],
@@ -49,8 +53,13 @@ const ROUTE_TITLES = {
   AppointmentForm: 'Datos del turno',
   ChangePassword: 'Cambiar contraseña',
   ClinicalRecords: 'Fichas clínicas',
+  ClinicalRecordsList: 'Fichas clínicas',
   Treatments: 'Tratamientos',
   Reports: 'Reportes',
+  TreatmentCatalog: 'Tratamientos y precios',
+  Dentists: 'Odontólogos',
+  Sales: 'Ventas',
+  PaymentMethods: 'Métodos de pago',
   Payments: 'Pagos y cuentas',
   Help: 'Ayuda',
   ...Object.fromEntries(
@@ -190,11 +199,13 @@ export default function WorkspaceShell({ role, route, navigation, children }) {
   );
 }
 
-export function withWorkspace(Screen, role) {
+export function withWorkspace(Screen, roleOverride) {
   function WorkspaceRoute(props) {
+    const { user } = require('../context/AuthContext').useAuth();
+    const role = roleOverride || user?.rol;
     return (
       <WorkspaceShell role={role} route={props.route} navigation={props.navigation}>
-        <Screen {...props} />
+        <Screen {...props} navigation={props.navigation} />
       </WorkspaceShell>
     );
   }

@@ -9,7 +9,7 @@ import StatusBadge from '../../components/StatusBadge';
 import Button from '../../components/Button';
 import Colors from '../../constants/colors';
 
-export default function UsersListScreen({ navigation }) {
+export default function UsersListScreen({ navigation, roleFilter, hideCreate = false }) {
   const [users, setUsers]         = useState([]);
   const [filtered, setFiltered]   = useState([]);
   const [search, setSearch]       = useState('');
@@ -19,15 +19,16 @@ export default function UsersListScreen({ navigation }) {
   const fetchUsers = useCallback(async () => {
     try {
       const data = await userService.getAll();
-      setUsers(data);
-      setFiltered(data);
+      const visible = roleFilter ? data.filter((item) => item.rol === roleFilter) : data;
+      setUsers(visible);
+      setFiltered(visible);
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'No se pudo cargar la lista');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [roleFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -131,7 +132,7 @@ export default function UsersListScreen({ navigation }) {
 
       {/* Contador */}
       <Text style={styles.counter}>
-        {filtered.length} {filtered.length === 1 ? 'usuario' : 'usuarios'}
+        {filtered.length} {roleFilter === 'odontologo' ? (filtered.length === 1 ? 'odontólogo' : 'odontólogos') : (filtered.length === 1 ? 'usuario' : 'usuarios')}
       </Text>
 
       <FlatList
@@ -155,13 +156,13 @@ export default function UsersListScreen({ navigation }) {
       />
 
       {/* FAB */}
-      <TouchableOpacity
+      {!hideCreate && <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate('CreateUser')}
         accessibilityLabel="Crear nuevo usuario"
       >
         <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+      </TouchableOpacity>}
     </View>
   );
 }

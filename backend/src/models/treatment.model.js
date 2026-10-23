@@ -36,6 +36,11 @@ const TreatmentModel = {
     return rows[0] || null;
   },
 
+  async isAssignedToOdontologo(id, odontologoId) {
+    const [rows] = await pool.execute('SELECT 1 FROM tratamientos WHERE id = ? AND odontologo_id = ? LIMIT 1', [id, odontologoId]);
+    return rows.length > 0;
+  },
+
   async create({ pacienteId, odontologoId, descripcion, costoTotal, notas, creadoPor }) {
     const [result] = await pool.execute(
       `INSERT INTO tratamientos (paciente_id, odontologo_id, descripcion, costo_total, notas)
@@ -45,21 +50,21 @@ const TreatmentModel = {
     return result.insertId;
   },
 
-  async update(id, { descripcion, estado, costoTotal, notas }) {
+  async update(id, { descripcion, estado, costoTotal, notas }, odontologoId = null) {
     const [result] = await pool.execute(
       `UPDATE tratamientos SET
          descripcion  = COALESCE(?, descripcion),
          estado       = COALESCE(?, estado),
          costo_total  = COALESCE(?, costo_total),
          notas        = COALESCE(?, notas)
-       WHERE id = ?`,
-      [descripcion, estado, costoTotal, notas, id]
+       WHERE id = ? AND (? IS NULL OR odontologo_id = ?)`,
+      [descripcion, estado, costoTotal, notas, id, odontologoId, odontologoId]
     );
     return result.affectedRows > 0;
   },
 
-  async delete(id) {
-    const [result] = await pool.execute(`DELETE FROM tratamientos WHERE id = ?`, [id]);
+  async delete(id, odontologoId = null) {
+    const [result] = await pool.execute(`DELETE FROM tratamientos WHERE id = ? AND (? IS NULL OR odontologo_id = ?)`, [id, odontologoId, odontologoId]);
     return result.affectedRows > 0;
   },
 };

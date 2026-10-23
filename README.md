@@ -18,7 +18,7 @@ Trabajo final/
 
 | Herramienta | Versión recomendada |
 |---|---|
-| Node.js | 18+ |
+| Node.js | 22.13+ (requerido por Expo SDK 58) |
 | npm | 9+ |
 | MariaDB | 10.6+ |
 | Expo Go (opcional) | última versión en Play Store |
@@ -80,9 +80,21 @@ npm start        # Modo producción
 
 El servidor queda disponible en `http://localhost:3000`.
 
-**Usuario administrador por defecto:**
+### Datos ficticios para recorrer las pantallas
+
+Con MariaDB encendida y el esquema creado, desde la carpeta `backend` ejecutá:
+
+```bash
+npm run seed:demo
+```
+
+El comando carga 15 pacientes de prueba, 4 odontólogos, una cuenta de recepción, turnos anteriores y futuros, fichas clínicas con odontogramas, planes de tratamiento y pagos. Los datos usan nombres y contactos ficticios (`.test` / `example.test`). Podés repetirlo sin duplicar las citas o pagos de demostración.
+
+Las cuentas de demostración son `ana.benitez@dentalis.test`, `mateo.gomez@dentalis.test`, `lucia.rojas@dentalis.test`, `nicolas.vera@dentalis.test` (odontólogos) y `recepcion.demo@dentalis.test` (recepción). La contraseña común es `DentalisDemo123!`. Cambiala o eliminá estas cuentas antes de usar una base real. El seed no crea ni modifica cuentas de administrador.
+
+**Usuario administrador local por defecto:**
 - Correo: `admin@dentalis.com`
-- Contraseña: `password` *(cambiala inmediatamente)*
+- Contraseña: `Admin1234!` *(cambiala antes de usar una base real)*
 
 ---
 
@@ -97,17 +109,17 @@ npm install
 
 ### 2. Configuración de la URL de la API
 
-Configurá `EXPO_PUBLIC_API_URL` en `frontend/.env` (podés partir de `frontend/.env.example`):
+Configurá las URLs de API en `frontend/.env` (podés partir de `frontend/.env.example`):
 
 | Entorno | URL |
 |---|---|
 | Emulador Android | `http://10.0.2.2:3000/api` |
-| Dispositivo físico | `http://TU_IP_LOCAL:3000/api` |
+| iPhone o Android físico | `EXPO_PUBLIC_API_URL_NATIVE=http://TU_IP_LOCAL:3000/api` |
 | Web (Expo web) | `http://localhost:3000/api` |
 
 Para encontrar tu IP local en Windows: ejecutá `ipconfig` en la terminal.
 
-La APK solo podrá conectarse si esta URL apunta a un servidor backend encendido y accesible desde el teléfono. Una IP local sirve únicamente mientras el Samsung y la computadora estén conectados a la misma red Wi-Fi.
+El teléfono y la computadora deben estar en la misma red Wi-Fi, MariaDB y el backend deben estar encendidos, y Windows debe permitir conexiones al puerto 3000. Si cambiás de red, actualizá `EXPO_PUBLIC_API_URL_NATIVE` y reiniciá Expo.
 
 ### 3. Configuración de inicio de sesión social
 
@@ -119,11 +131,21 @@ Las credenciales OAuth privadas permanecen en el backend; no copies los secretos
 
 ### 4. Ejecutar
 
-```bash
-npm run android    # Lanzar en emulador Android
-npm run ios        # Lanzar en simulador iOS (solo macOS)
-npm start          # Iniciar Metro Bundler (escanear QR con Expo Go)
+Usá dos terminales de PowerShell: primero encendé MariaDB en Servicios de Windows; luego iniciá la API:
+
+```powershell
+cd "C:\Users\ledes\OneDrive\Escritorio\Trabajo final\backend"
+npm start
 ```
+
+En otra terminal, iniciá Expo y escaneá el QR nuevo con Expo Go:
+
+```bash
+cd "C:\Users\ledes\OneDrive\Escritorio\Trabajo final\frontend"
+npm start
+```
+
+El proyecto ahora usa Expo SDK 58; cerrá la sesión anterior de Expo Go y escaneá el QR del servidor recién iniciado.
 
 ---
 
@@ -180,7 +202,7 @@ Authorization: Bearer <accessToken>
 }
 ```
 
-**Roles válidos:** `administrador` | `recepcion` | `odontologo`
+**Roles válidos:** `administrador` | `recepcion` | `odontologo` | `usuario`
 
 ### Códigos de error comunes
 
@@ -204,7 +226,8 @@ Authorization: Bearer <accessToken>
 | Ficha clínica | ❌ | ❌ | ✅ |
 | Tratamientos | ✅ | ❌ | ✅ |
 | Registrar pagos | ✅ | ✅ | ❌ |
-| Ver reportes | ✅ | 🔒 (limitado) | ❌ |
+| Ver reportes | ✅ | ❌ | ❌ |
+| Acceso de usuario básico | — | — | — |
 
 ---
 

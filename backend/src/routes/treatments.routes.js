@@ -11,7 +11,7 @@ router.get('/',    authorize('administrador','recepcion','odontologo'), getTreat
 router.get('/:id', authorize('administrador','recepcion','odontologo'), getTreatmentById);
 
 router.post('/',
-  authorize('administrador','odontologo'),
+  authorize('odontologo'),
   [
     body('pacienteId').isInt().withMessage('pacienteId requerido'),
     body('odontologoId').isInt().withMessage('odontologoId requerido'),
@@ -22,7 +22,7 @@ router.post('/',
 );
 
 router.put('/:id',
-  authorize('administrador','odontologo'),
+  authorize('odontologo'),
   [
     body('estado').optional().isIn(['planificado','en_curso','completado','cancelado']),
     body('costoTotal').optional().isFloat({ min: 0 }),
@@ -30,6 +30,6 @@ router.put('/:id',
   validate, updateTreatment
 );
 
-router.delete('/:id', authorize('administrador'), deleteTreatment);
+router.delete('/:id', authorize('odontologo'), deleteTreatment);
 
 module.exports = router;

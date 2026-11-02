@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { TrackedScrollView } from '../../components/TrackedScroll';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Card from '../../components/Card';
 import paymentService from '../../services/paymentService';
 import Colors from '../../constants/colors';
+import { useAppUi } from '../../context/AppUiContext';
 
 const METHODS = [
   ['efectivo', 'Efectivo', '💵', '#E7F7F0', '#208260'],
@@ -14,20 +16,27 @@ const METHODS = [
 const money = (v) => `Gs. ${Number(v || 0).toLocaleString('es-PY')}`;
 
 export default function PaymentMethodsScreen() {
+  const { colors } = useAppUi();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
     try { setPayments(await paymentService.getAll()); } catch { setPayments([]); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    void load();
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [load]);
 
   if (loading) return <View style={s.centered}><ActivityIndicator color={Colors.primary} size="large" /></View>;
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <Text style={s.eyebrow}>FINANZAS · ESTE MES</Text>
-      <Text style={s.title}>Métodos de pago</Text>
-      <Text style={s.subtitle}>Distribución de los pagos registrados según el medio utilizado.</Text>
+    <TrackedScrollView style={[s.container, { backgroundColor: colors.background }]} contentContainerStyle={s.content}>
+      <Text style={[s.eyebrow, { color: colors.muted }]}>FINANZAS · ESTE MES</Text>
+      <Text style={[s.title, { color: colors.text }]}>Métodos de pago</Text>
+      <Text style={[s.subtitle, { color: colors.muted }]}>Distribución de los pagos registrados según el medio utilizado.</Text>
       {METHODS.map(([key, label, icon, bg, color]) => {
         const matched = payments.filter((p) => p.metodo === key);
         const total = matched.reduce((sum, p) => sum + Number(p.importe || 0), 0);
@@ -35,14 +44,14 @@ export default function PaymentMethodsScreen() {
           <Card key={key} style={s.card}>
             <View style={s.row}>
               <View style={[s.iconBox, { backgroundColor: bg }]}><Text style={[s.icon, { color }]}>{icon}</Text></View>
-              <View style={s.copy}><Text style={s.name}>{label}</Text><Text style={s.meta}>{matched.length} {matched.length === 1 ? 'pago' : 'pagos'} · total histórico</Text></View>
+              <View style={s.copy}><Text style={[s.name, { color: colors.text }]}>{label}</Text><Text style={[s.meta, { color: colors.muted }]}>{matched.length} {matched.length === 1 ? 'pago' : 'pagos'} · total histórico</Text></View>
               <Text style={s.total}>{money(total)}</Text>
             </View>
           </Card>
         );
       })}
-      <Text style={s.note}>Los medios disponibles para registrar cobros son efectivo, tarjetas, transferencia y obra social.</Text>
-    </ScrollView>
+      <Text style={[s.note, { color: colors.muted }]}>Los medios disponibles para registrar cobros son efectivo, tarjetas, transferencia y obra social.</Text>
+    </TrackedScrollView>
   );
 }
 

@@ -13,6 +13,15 @@ async function getUsers(req, res, next) {
   }
 }
 
+async function getDentists(req, res, next) {
+  try {
+    const odontologos = await UserModel.findActiveDentists();
+    return res.status(200).json({ odontologos });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── Obtener usuario por ID ──────────────────────────────────────────────────
 
 async function getUserById(req, res, next) {
@@ -31,7 +40,10 @@ async function getUserById(req, res, next) {
 
 async function createUser(req, res, next) {
   try {
-    const { nombre, apellido, correo, username, password, rol } = req.body;
+    const { username, password, rol } = req.body;
+    const nombre = req.body.nombre.trim();
+    const apellido = req.body.apellido.trim();
+    const correo = req.body.correo.trim().toLowerCase();
 
     // Verificar que el correo no esté en uso
     const existing = await UserModel.findByEmailOrUsername(correo);
@@ -41,15 +53,17 @@ async function createUser(req, res, next) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const newId = await UserModel.create({
-      nombre,
-      apellido,
-      correo,
-      username: username || null,
-      passwordHash,
-      rol,
-      creadoPor: req.user.id,
-    });
+    const newId = rol === 'usuario'
+      ? await UserModel.createPatientAccount({ nombre, apellido, correo, passwordHash })
+      : await UserModel.create({
+          nombre,
+          apellido,
+          correo,
+          username: username || null,
+          passwordHash,
+          rol,
+          creadoPor: req.user.id,
+        });
 
     await logActivity({
       usuarioId: req.user.id,
@@ -65,6 +79,15 @@ async function createUser(req, res, next) {
       userId: newId,
     });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: true, message: 'El correo ya está registrado' });
+    }
+    if (err.code === 'ER_BAD_FIELD_ERROR' && /usuario_id/i.test(err.message || '')) {
+      return res.status(503).json({
+        error: true,
+        message: 'La base de datos todavía no está preparada para crear pacientes. Ejecutá backend/src/config/migrations/004_public_patient_accounts.sql en la base dentalis y volvé a intentar.',
+      });
+    }
     next(err);
   }
 }
@@ -148,4 +171,4 @@ async function getMe(req, res, next) {
   }
 }
 
-module.exports = { getUsers, getUserById, createUser, updateUser, changePassword, getMe };
+module.exports = { getUsers, getDentists, getUserById, createUser, updateUser, changePassword, getMe };

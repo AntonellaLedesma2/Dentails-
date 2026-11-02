@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, RefreshControl, TextInput,
 } from 'react-native';
 import patientService from '../../services/patientService';
-import StatusBadge from '../../components/StatusBadge';
 import Colors from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../constants/roles';
@@ -18,16 +18,18 @@ function calcAge(fechaNacimiento) {
 export default function PatientsScreen({ navigation, clinicalMode = false }) {
   const { user } = useAuth();
   const canEdit = user?.rol === ROLES.ADMINISTRADOR || user?.rol === ROLES.RECEPCION;
+  const canManageStatus = user?.rol === ROLES.ADMINISTRADOR && !clinicalMode;
 
   const [patients, setPatients]   = useState([]);
   const [filtered, setFiltered]   = useState([]);
   const [search, setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState('activo');
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchPatients = useCallback(async () => {
     try {
-      const data = await patientService.getAll();
+      const data = await patientService.getAll('', statusFilter);
       setPatients(data);
       setFiltered(data);
     } catch (err) {
@@ -36,13 +38,20 @@ export default function PatientsScreen({ navigation, clinicalMode = false }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
-    fetchPatients();
-    const unsub = navigation.addListener('focus', fetchPatients);
-    return unsub;
-  }, [fetchPatients, navigation]);
+  const timer = setTimeout(() => {
+    void fetchPatients();
+  }, 0);
+
+  const unsubscribe = navigation.addListener('focus', fetchPatients);
+
+  return () => {
+    clearTimeout(timer);
+    unsubscribe();
+  };
+}, [fetchPatients, navigation]);
 
   function handleSearch(text) {
     setSearch(text);
@@ -52,7 +61,8 @@ export default function PatientsScreen({ navigation, clinicalMode = false }) {
         p.nombre.toLowerCase().includes(q) ||
         p.apellido.toLowerCase().includes(q) ||
         (p.dni && p.dni.includes(q)) ||
-        (p.telefono && p.telefono.includes(q))
+        (p.telefono && p.telefono.includes(q)) ||
+        (p.correo && p.correo.toLowerCase().includes(q))
       )
     );
   }
@@ -80,6 +90,7 @@ export default function PatientsScreen({ navigation, clinicalMode = false }) {
           </View>
           {item.telefono && <Text style={styles.meta}>📞 {item.telefono}</Text>}
           {item.obra_social && <Text style={styles.meta}>🏥 {item.obra_social}</Text>}
+          {canManageStatus && item.estado === 'inactivo' && <Text style={styles.inactiveTag}>Inactivo · tocá para reactivar</Text>}
         </View>
 
         <View style={styles.cardRight}>
@@ -112,9 +123,31 @@ export default function PatientsScreen({ navigation, clinicalMode = false }) {
         )}
       </View>
 
+      {canManageStatus && (
+        <View style={styles.statusFilters}>
+          {[
+            { value: 'activo', label: 'Activos' },
+            { value: 'inactivo', label: 'Inactivos' },
+          ].map((option) => {
+            const selected = statusFilter === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.statusFilter, selected && styles.statusFilterActive]}
+                onPress={() => setStatusFilter(option.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+              >
+                <Text style={[styles.statusFilterText, selected && styles.statusFilterTextActive]}>{option.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       <Text style={styles.counter}>{filtered.length} {filtered.length === 1 ? 'paciente' : 'pacientes'}</Text>
 
-      <FlatList
+      <TrackedFlatList
         data={filtered}
         keyExtractor={(p) => String(p.id)}
         renderItem={renderPatient}
@@ -165,6 +198,12 @@ const styles = StyleSheet.create({
   searchIcon:  { fontSize: 15, marginRight: 8, color: Colors.text.secondary },
   searchInput: { flex: 1, fontSize: 14, color: Colors.text.primary, paddingVertical: 11 },
   clearBtn:    { fontSize: 14, color: Colors.text.secondary, padding: 4 },
+  statusFilters: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 10 },
+  statusFilter: { borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8 },
+  statusFilterActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  statusFilterText: { fontSize: 13, color: Colors.text.secondary, fontWeight: '600' },
+  statusFilterTextActive: { color: Colors.primaryDark },
+  inactiveTag: { color: '#B42332', fontSize: 11, fontWeight: '600', marginTop: 3 },
 
   counter: {
     fontSize: 12,

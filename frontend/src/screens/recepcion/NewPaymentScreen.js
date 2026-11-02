@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import paymentService   from '../../services/paymentService';
@@ -50,8 +51,7 @@ export default function NewPaymentScreen({ route, navigation }) {
       finally { setFetching(false); }
     }
     load();
-  }, []);
-
+}, [odontologoId, selectedPatientId]);
   async function loadTreatments(pacienteId) {
     try {
       const treats = await treatmentService.getAll({ paciente_id: pacienteId, odontologo_id: odontologoId });
@@ -87,11 +87,11 @@ export default function NewPaymentScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+      <TrackedScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
 
         <Text style={s.sectionLabel}>PACIENTE</Text>
         <View style={s.section}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TrackedScrollView horizontal showsHorizontalScrollIndicator={false}>
             {patients.map((p) => (
               <TouchableOpacity
                 key={p.id}
@@ -107,14 +107,14 @@ export default function NewPaymentScreen({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </TrackedScrollView>
         </View>
 
         {treatments.length > 0 && (
           <>
             <Text style={s.sectionLabel}>TRATAMIENTO (opcional)</Text>
             <View style={s.section}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <TrackedScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <TouchableOpacity
                   style={[s.chip, !form.tratamientoId && s.chipActive]}
                   onPress={() => set('tratamientoId', '')}
@@ -135,7 +135,7 @@ export default function NewPaymentScreen({ route, navigation }) {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </TrackedScrollView>
             </View>
           </>
         )}
@@ -173,7 +173,7 @@ export default function NewPaymentScreen({ route, navigation }) {
         </View>
 
         <Button title="Registrar pago" onPress={handleSubmit} loading={loading} size="lg" style={s.btn} />
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }

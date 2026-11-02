@@ -25,6 +25,11 @@ const patientService = {
     const res = await api.delete(`/patients/${id}`);
     return res.data;
   },
+
+  async setStatus(id, estado) {
+    const res = await api.patch(`/patients/${id}/estado`, { estado });
+    return res.data;
+  },
 };
 
 export default patientService;

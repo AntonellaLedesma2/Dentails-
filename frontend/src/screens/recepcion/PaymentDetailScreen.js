@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TrackedScrollView } from '../../components/TrackedScroll';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Card from '../../components/Card';
 import paymentService from '../../services/paymentService';
 import Colors from '../../constants/colors';
@@ -23,11 +24,16 @@ export default function PaymentDetailScreen({ route, navigation }) {
     } catch (error) { Alert.alert('Error', error.response?.data?.message || 'No se pudo cargar la cuenta'); }
     finally { setLoading(false); }
   }, [odontologoId, pacienteId]);
-  useEffect(() => { load(); }, [load]);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    void load();
+  }, 0);
 
+  return () => clearTimeout(timer);
+}, [load]);
   if (loading) return <View style={s.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
+    <TrackedScrollView style={s.container} contentContainerStyle={s.content}>
       <Text style={s.eyebrow}>CUENTA DEL PACIENTE</Text>
       <Text style={s.title}>{account?.paciente_nombre || 'Detalle de cuenta'}</Text>
       <Text style={s.subtitle}>Cuenta asociada al odontólogo seleccionado.</Text>
@@ -46,7 +52,7 @@ export default function PaymentDetailScreen({ route, navigation }) {
         </Card>
       ))}
       {!payments.length && <Text style={s.empty}>Todavía no hay pagos registrados para este paciente y odontólogo.</Text>}
-    </ScrollView>
+    </TrackedScrollView>
   );
 }
 

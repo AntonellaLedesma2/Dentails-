@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
 
-const { getUsers, getUserById, createUser, updateUser, changePassword, getMe } = require('../controllers/users.controller');
+const { getUsers, getDentists, getUserById, createUser, updateUser, changePassword, getMe } = require('../controllers/users.controller');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validate } = require('../middlewares/validate.middleware');
 
@@ -10,11 +10,12 @@ const { validate } = require('../middlewares/validate.middleware');
 router.use(authenticate);
 
 // GET /api/users/me  - perfil propio (cualquier rol)
-router.get('/me', getMe);
+router.get('/me', authorize('administrador', 'recepcion', 'odontologo'), getMe);
 
 // PUT /api/users/me/password  - cambiar contraseña propia (cualquier rol)
 router.put(
   '/me/password',
+  authorize('administrador', 'recepcion', 'odontologo'),
   [
     body('currentPassword').notEmpty().withMessage('Contraseña actual requerida'),
     body('newPassword')
@@ -26,6 +27,9 @@ router.put(
 );
 
 // ─── Solo administrador ───────────────────────────────────────────────────────
+
+// Selectores de agenda: solo expone nombre e ID de odontólogos activos.
+router.get('/odontologos', authorize('administrador', 'recepcion', 'usuario'), getDentists);
 
 // GET /api/users  - listar todos
 router.get('/', authorize('administrador'), getUsers);

@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import RoleBadge from '../../components/RoleBadge';
 import Button from '../../components/Button';
@@ -7,18 +8,10 @@ import Colors from '../../constants/colors';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   async function handleLogout() {
-    Alert.alert('Cerrar sesión', '¿Estás seguro que querés salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Cerrar sesión',
-        style: 'destructive',
-        onPress: async () => {
-          try { await logout(); } catch {}
-        },
-      },
-    ]);
+    try { await logout(); } catch {} finally { setConfirmLogout(false); }
   }
 
   const menuItems = [
@@ -27,7 +20,7 @@ export default function ProfileScreen({ navigation }) {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <TrackedScrollView style={styles.container} contentContainerStyle={styles.content}>
 
       {/* Header de perfil */}
       <View style={styles.profileHeader}>
@@ -60,13 +53,25 @@ export default function ProfileScreen({ navigation }) {
 
       <Button
         title="Cerrar sesión"
-        onPress={handleLogout}
+        onPress={() => setConfirmLogout(true)}
         variant="danger"
         style={styles.logoutBtn}
       />
 
       <Text style={styles.version}>DENTALIS v1.0.0</Text>
-    </ScrollView>
+      <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => setConfirmLogout(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Cerrar sesión</Text>
+            <Text style={styles.modalMessage}>¿Estás seguro que querés salir de tu cuenta?</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setConfirmLogout(false)}><Text style={styles.modalCancelText}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleLogout}><Text style={styles.modalConfirmText}>Cerrar sesión</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </TrackedScrollView>
   );
 }
 
@@ -134,4 +139,13 @@ const styles = StyleSheet.create({
 
   logoutBtn: { marginBottom: 20 },
   version:   { textAlign: 'center', fontSize: 12, color: Colors.text.label },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.48)', justifyContent: 'center', padding: 24 },
+  modalCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 22 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
+  modalMessage: { fontSize: 14, color: Colors.text.secondary, marginTop: 8, lineHeight: 21 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 22 },
+  modalCancel: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 9, backgroundColor: Colors.background },
+  modalCancelText: { color: Colors.text.primary, fontWeight: '600' },
+  modalConfirm: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 9, backgroundColor: '#D9232E' },
+  modalConfirmText: { color: '#FFFFFF', fontWeight: '700' },
 });

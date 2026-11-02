@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedScrollView, TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, useWindowDimensions,
-  Alert, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions,
+  Alert, ActivityIndicator, RefreshControl, Modal,
 } from 'react-native';
 import appointmentService from '../../services/appointmentService';
 import StatusBadge from '../../components/StatusBadge';
 import Colors from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../constants/roles';
+import { useAppUi } from '../../context/AppUiContext';
+import Button from '../../components/Button';
 
 // Días de la semana para el selector de fecha
 function buildWeekDays() {
@@ -31,9 +34,11 @@ function formatHora(hora) {
 
 export default function AppointmentsScreen({ navigation }) {
   const { user } = useAuth();
+  const { colors } = useAppUi();
   const { width } = useWindowDimensions();
   const showBoard = width >= 1050 && user?.rol !== ROLES.ODONTOLOGO;
   const canCreate = user?.rol === ROLES.ADMINISTRADOR || user?.rol === ROLES.RECEPCION;
+  const canRequest = user?.rol === ROLES.ODONTOLOGO;
 
   const weekDays  = buildWeekDays();
   const todayStr  = weekDays[0].date;
@@ -42,6 +47,9 @@ export default function AppointmentsScreen({ navigation }) {
   const [appointments, setAppointments]   = useState([]);
   const [loading, setLoading]             = useState(true);
   const [refreshing, setRefreshing]       = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const doctorColumns = [...new Map(appointments.map((item) => [String(item.odontologo_id), {
     id: item.odontologo_id,
@@ -64,47 +72,37 @@ export default function AppointmentsScreen({ navigation }) {
   }, [selectedDate]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchAppointments(selectedDate);
-  }, [selectedDate]);
+    const initialLoad = setTimeout(() => fetchAppointments(selectedDate), 0);
+    return () => clearTimeout(initialLoad);
+  }, [fetchAppointments, selectedDate]);
 
   useEffect(() => {
-    const unsub = navigation.addListener('focus', () => fetchAppointments(selectedDate));
+    const unsub = navigation.addListener('focus', fetchAppointments);
     return unsub;
-  }, [navigation, selectedDate]);
+  }, [navigation, fetchAppointments]);
 
-  async function handleCancel(appt) {
-    Alert.alert(
-      'Cancelar turno',
-      `¿Cancelar el turno de ${appt.paciente_nombre}?`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Cancelar turno',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await appointmentService.cancel(appt.id);
-              fetchAppointments(selectedDate);
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || 'No se pudo cancelar');
-            }
-          },
-        },
-      ]
-    );
+  async function handleCancel() {
+    if (!cancelTarget) return;
+    setCancelLoading(true);
+    setCancelError('');
+    try {
+      await appointmentService.cancel(cancelTarget.id);
+      setCancelTarget(null);
+      fetchAppointments(selectedDate);
+    } catch (err) {
+      setCancelError(err.response?.data?.message || 'No se pudo cancelar el turno.');
+    } finally {
+      setCancelLoading(false);
+    }
   }
+
+  const canManageAppointment = (item) => user?.rol === ROLES.ADMINISTRADOR && ['pendiente', 'confirmado', 'reprogramado'].includes(item.estado);
 
   function renderAppointment({ item }) {
     const isOwnAppt = user?.rol === ROLES.ODONTOLOGO;
 
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={canCreate ? () => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id }) : undefined}
-        disabled={!canCreate}
-        activeOpacity={0.85}
-      >
+      <View style={styles.card}>
         {/* Hora y duración */}
         <View style={styles.timeCol}>
           <Text style={styles.hora}>{formatHora(item.hora)}</Text>
@@ -135,10 +133,14 @@ export default function AppointmentsScreen({ navigation }) {
             >
               <Text style={styles.actionBtnText}>✓</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.cancelBtn]}
-              onPress={() => handleCancel(item)}
-            >
+          </View>
+        )}
+        {canManageAppointment(item) && (
+          <View style={styles.actionsCol}>
+            <TouchableOpacity style={[styles.actionBtn, styles.editBtn]} onPress={() => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id })} accessibilityLabel="Editar turno">
+              <Text style={styles.actionBtnText}>✎</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, styles.cancelBtn]} onPress={() => { setCancelError(''); setCancelTarget(item); }} accessibilityLabel="Cancelar turno">
               <Text style={styles.actionBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -156,7 +158,7 @@ export default function AppointmentsScreen({ navigation }) {
             <Text style={styles.actionBtnText}>✓</Text>
           </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
     );
   }
 
@@ -169,7 +171,11 @@ export default function AppointmentsScreen({ navigation }) {
         <Text style={styles.boardPatient} numberOfLines={1}>{item.paciente_nombre}</Text>
         <Text style={styles.boardReason} numberOfLines={2}>{item.motivo || 'Consulta odontológica'}</Text>
         <View style={styles.boardFoot}><Text style={[styles.boardStatus, { color: stateColor }]}>{item.estado}</Text><Text style={styles.boardDuration}>{item.duracion_min} min</Text></View>
-        {canCreate && item.estado === 'pendiente' && <TouchableOpacity style={styles.boardConfirm} onPress={async () => { await appointmentService.changeEstado(item.id, 'confirmado'); fetchAppointments(selectedDate); }}><Text style={styles.boardConfirmText}>Confirmar</Text></TouchableOpacity>}
+        {canCreate && <View style={styles.boardActions}>
+          {item.estado === 'pendiente' && <TouchableOpacity style={styles.boardConfirm} onPress={async () => { try { await appointmentService.changeEstado(item.id, 'confirmado'); fetchAppointments(selectedDate); } catch (err) { Alert.alert('Error', err.response?.data?.message || 'No se pudo confirmar el turno'); } }}><Text style={styles.boardConfirmText}>Confirmar</Text></TouchableOpacity>}
+          {canManageAppointment(item) && <TouchableOpacity style={styles.boardEdit} onPress={() => navigation.navigate('AppointmentForm', { mode: 'edit', appointmentId: item.id })}><Text style={styles.boardEditText}>Editar</Text></TouchableOpacity>}
+          {canManageAppointment(item) && <TouchableOpacity style={styles.boardCancel} onPress={() => { setCancelError(''); setCancelTarget(item); }}><Text style={styles.boardCancelText}>Cancelar</Text></TouchableOpacity>}
+        </View>}
       </TouchableOpacity>
     );
   }
@@ -183,7 +189,7 @@ export default function AppointmentsScreen({ navigation }) {
           <TouchableOpacity
             key={d.date}
             style={[styles.dayBtn, selectedDate === d.date && styles.dayBtnActive]}
-            onPress={() => setSelectedDate(d.date)}
+            onPress={() => { if (selectedDate !== d.date) setLoading(true); setSelectedDate(d.date); }}
           >
             <Text style={[styles.dayLabel, selectedDate === d.date && styles.dayLabelActive]}>
               {d.label}
@@ -207,7 +213,7 @@ export default function AppointmentsScreen({ navigation }) {
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : showBoard ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.board}>
+        <TrackedScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.board}>
           {doctorColumns.length ? doctorColumns.map((doctor) => (
             <View key={doctor.id} style={styles.doctorColumn}>
               <View style={styles.doctorColumnHeader}><View style={styles.doctorAvatar}><Text style={styles.doctorAvatarText}>{doctor.name[0]}</Text></View><View style={{ flex: 1 }}><Text style={styles.doctorColumnName} numberOfLines={1}>Dr/a. {doctor.name}</Text><Text style={styles.doctorColumnMeta}>{doctor.appointments.length} turnos</Text></View></View>
@@ -215,9 +221,9 @@ export default function AppointmentsScreen({ navigation }) {
               {!doctor.appointments.length && <Text style={styles.boardEmpty}>Agenda libre</Text>}
             </View>
           )) : <View style={styles.empty}><Text style={styles.emptyIcon}>📅</Text><Text style={styles.emptyTitle}>Sin turnos para este día</Text></View>}
-        </ScrollView>
+        </TrackedScrollView>
       ) : (
-        <FlatList
+        <TrackedFlatList
           data={appointments}
           keyExtractor={(a) => String(a.id)}
           renderItem={renderAppointment}
@@ -241,15 +247,29 @@ export default function AppointmentsScreen({ navigation }) {
         />
       )}
 
-      {canCreate && (
+      {(canCreate || canRequest) && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => navigation.navigate('AppointmentForm', { mode: 'create', fecha: selectedDate })}
-          accessibilityLabel="Nuevo turno"
+          accessibilityLabel={canRequest ? 'Solicitar turno' : 'Nuevo turno'}
         >
-          <Text style={styles.fabIcon}>+</Text>
+          <Text style={styles.fabIcon}>{canRequest ? '＋' : '+'}</Text>
         </TouchableOpacity>
       )}
+
+      <Modal visible={Boolean(cancelTarget)} transparent animationType="fade" onRequestClose={() => !cancelLoading && setCancelTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Cancelar turno</Text>
+            <Text style={[styles.modalMessage, { color: colors.muted }]}>¿Querés cancelar el turno de {cancelTarget?.paciente_nombre}? Esta acción quedará registrada en el historial.</Text>
+            {cancelError ? <Text style={styles.modalError}>{cancelError}</Text> : null}
+            <View style={styles.modalActions}>
+              <Button title="Volver" variant="outline" onPress={() => setCancelTarget(null)} disabled={cancelLoading} style={styles.modalButton} />
+              <Button title="Sí, cancelar" onPress={handleCancel} loading={cancelLoading} style={styles.modalButton} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -332,6 +352,7 @@ const styles = StyleSheet.create({
   },
   confirmBtn: { backgroundColor: Colors.successLight },
   cancelBtn:  { backgroundColor: Colors.errorLight },
+  editBtn: { backgroundColor: Colors.primaryLight },
   doneBtn:    { backgroundColor: Colors.primaryLight },
   actionBtnText: { fontSize: 14, fontWeight: '700', color: Colors.text.primary },
 
@@ -354,4 +375,16 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabIcon: { fontSize: 26, color: Colors.white, lineHeight: 30 },
+  boardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 8 },
+  boardEdit: { borderRadius: 5, backgroundColor: '#EDF3FE', paddingHorizontal: 8, paddingVertical: 5 },
+  boardEditText: { color: '#3D6BCB', fontSize: 8, fontWeight: '800' },
+  boardCancel: { borderRadius: 5, backgroundColor: '#FCEAEC', paddingHorizontal: 8, paddingVertical: 5 },
+  boardCancelText: { color: '#B74655', fontSize: 8, fontWeight: '800' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(8,15,28,0.56)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 440, borderRadius: 18, borderWidth: 1, padding: 22 },
+  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 8 },
+  modalMessage: { fontSize: 14, lineHeight: 21 },
+  modalError: { color: '#C53E4B', fontSize: 13, marginTop: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20 },
+  modalButton: { minWidth: 120 },
 });

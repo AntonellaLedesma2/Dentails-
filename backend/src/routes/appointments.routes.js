@@ -4,6 +4,7 @@ const router = express.Router();
 
 const {
   getAppointments, getAppointmentById,
+  getAppointmentRequests,
   createAppointment, updateAppointment,
   changeEstado, cancelAppointment,
 } = require('../controllers/appointments.controller');
@@ -14,6 +15,7 @@ router.use(authenticate);
 
 // GET /api/appointments
 router.get('/', authorize('administrador', 'recepcion', 'odontologo'), getAppointments);
+router.get('/requests', authorize('administrador', 'recepcion'), getAppointmentRequests);
 
 // GET /api/appointments/:id
 router.get('/:id', authorize('administrador', 'recepcion', 'odontologo'), getAppointmentById);
@@ -21,12 +23,13 @@ router.get('/:id', authorize('administrador', 'recepcion', 'odontologo'), getApp
 // POST /api/appointments
 router.post(
   '/',
-  authorize('administrador', 'recepcion'),
+  authorize('administrador', 'recepcion', 'odontologo', 'usuario'),
   [
-    body('pacienteId').isInt().withMessage('pacienteId requerido'),
+    body('pacienteId').optional().isInt().withMessage('pacienteId inválido'),
     body('odontologoId').isInt().withMessage('odontologoId requerido'),
     body('fecha').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('fecha debe ser AAAA-MM-DD'),
     body('hora').matches(/^\d{2}:\d{2}$/).withMessage('hora debe ser HH:MM'),
+    body('duracionMin').optional().isInt({ min: 1, max: 480 }).withMessage('duracionMin debe estar entre 1 y 480 minutos'),
   ],
   validate,
   createAppointment
@@ -35,10 +38,12 @@ router.post(
 // PUT /api/appointments/:id
 router.put(
   '/:id',
-  authorize('administrador', 'recepcion'),
+  authorize('administrador'),
   [
     body('fecha').optional().matches(/^\d{4}-\d{2}-\d{2}$/),
     body('hora').optional().matches(/^\d{2}:\d{2}$/),
+    body('duracionMin').optional().isInt({ min: 1, max: 480 }).withMessage('duracionMin debe estar entre 1 y 480 minutos'),
+    body('estado').optional().isIn(['pendiente', 'confirmado', 'cancelado', 'reprogramado', 'realizado']),
   ],
   validate,
   updateAppointment
@@ -54,6 +59,6 @@ router.patch(
 );
 
 // DELETE /api/appointments/:id  → cancelar
-router.delete('/:id', authorize('administrador', 'recepcion'), cancelAppointment);
+router.delete('/:id', authorize('administrador'), cancelAppointment);
 
 module.exports = router;

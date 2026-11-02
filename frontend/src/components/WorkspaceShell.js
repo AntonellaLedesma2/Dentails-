@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_LABELS, ROLES } from '../constants/roles';
-import Colors from '../constants/colors';
+import { useAppUi } from '../context/AppUiContext';
 
 const MENUS = {
   [ROLES.ADMINISTRADOR]: [
     { section: 'CLÍNICA', label: 'Dashboard', icon: '▦', route: 'AdminHome' },
     { section: 'CLÍNICA', label: 'Reservaciones', icon: '▣', route: 'Agenda' },
+    { section: 'CLÍNICA', label: 'Solicitudes', icon: '◷', route: 'AppointmentRequests' },
     { section: 'CLÍNICA', label: 'Pacientes', icon: '◉', route: 'Patients' },
     { section: 'CLÍNICA', label: 'Tratamientos', icon: '◇', route: 'TreatmentCatalog' },
     { section: 'CLÍNICA', label: 'Odontólogos', icon: '♙', route: 'Dentists' },
@@ -23,6 +24,7 @@ const MENUS = {
   [ROLES.RECEPCION]: [
     { section: 'CLÍNICA', label: 'Resumen', icon: '▦', route: 'RecepcionHome' },
     { section: 'CLÍNICA', label: 'Agenda', icon: '▣', route: 'Agenda' },
+    { section: 'CLÍNICA', label: 'Solicitudes', icon: '◷', route: 'AppointmentRequests' },
     { section: 'CLÍNICA', label: 'Pacientes', icon: '◉', route: 'Patients' },
     { section: 'ADMINISTRACIÓN', label: 'Pagos y cuentas', icon: '$', route: 'Payments' },
     { section: 'CUENTA', label: 'Mi perfil', icon: '○', route: 'Profile' },
@@ -51,6 +53,7 @@ const ROUTE_TITLES = {
   PatientForm: 'Datos del paciente',
   PatientDetail: 'Paciente',
   AppointmentForm: 'Datos del turno',
+  AppointmentRequests: 'Solicitudes de turnos',
   ChangePassword: 'Cambiar contraseña',
   ClinicalRecords: 'Fichas clínicas',
   ClinicalRecordsList: 'Fichas clínicas',
@@ -67,34 +70,45 @@ const ROUTE_TITLES = {
   ),
 };
 
+const COMPACT_LABELS = {
+  AdminHome: 'Inicio', AdminDashboard: 'Inicio', Agenda: 'Agenda', Patients: 'Pacientes',
+  TreatmentCatalog: 'Tratam.', Dentists: 'Odont.', Payments: 'Cuentas', Sales: 'Ventas',
+  PaymentMethods: 'Métodos', Reports: 'Informes', UsersList: 'Usuarios', Profile: 'Perfil',
+  RecepcionHome: 'Inicio', OdontologoHome: 'Inicio', ClinicalRecordsList: 'Fichas',
+  Treatments: 'Tratam.', UsuarioHome: 'Inicio', ChangePassword: 'Clave', Help: 'Ayuda',
+};
+
 function NavItem({ item, active, onPress, compact = false }) {
+  const { colors } = useAppUi();
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={[compact ? styles.compactItem : styles.navItem, active && styles.navItemActive]}
+      style={[compact ? styles.compactItem : styles.navItem, active && { backgroundColor: colors.soft }]}
     >
-      <Text style={[styles.navIcon, active && styles.navTextActive]}>{item.icon}</Text>
-      <Text numberOfLines={1} style={[styles.navLabel, active && styles.navTextActive]}>{item.label}</Text>
+      <Text style={[styles.navIcon, compact && styles.compactNavIcon, { color: active ? colors.primary : colors.muted }]}>{item.icon}</Text>
+      <Text numberOfLines={1} style={[styles.navLabel, compact && styles.compactNavLabel, { color: active ? colors.primary : colors.muted }]}>{compact ? COMPACT_LABELS[item.route] || item.label : item.label}</Text>
     </TouchableOpacity>
   );
 }
 
 export default function WorkspaceShell({ role, route, navigation, children }) {
   const { user, logout } = useAuth();
+  const { colors, mode, toggleTheme, showScrollTop, scrollToTop, hideScrollTop } = useAppUi();
   const { width } = useWindowDimensions();
   const menu = MENUS[role] || MENUS[ROLES.USUARIO];
   const isDesktop = Platform.OS === 'web' && width >= 1080;
   const title = ROUTE_TITLES[route?.name] || route?.name || 'DENTALIS';
   const sections = [...new Set(menu.map((item) => item.section))];
+  useEffect(() => { hideScrollTop(); }, [route?.key, hideScrollTop]);
 
   function openRoute(target) {
     if (target !== route?.name) navigation.navigate(target);
   }
 
   async function handleLogout() {
-    await logout();
+    try { await logout(); } catch {}
   }
 
   const navigationItems = (compact = false) => menu.map((item) => (
@@ -108,28 +122,28 @@ export default function WorkspaceShell({ role, route, navigation, children }) {
   ));
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, !isDesktop && styles.rootMobile, { backgroundColor: colors.background }]}>
       {isDesktop ? (
-        <View style={styles.sidebar}>
+        <View style={[styles.sidebar, { backgroundColor: colors.surface, borderRightColor: colors.border }]}>
           <View style={styles.brandRow}>
             <View style={styles.brandMark}><Text style={styles.brandTooth}>✦</Text></View>
             <View>
-              <Text style={styles.brand}>DENTALIS</Text>
-              <Text style={styles.brandCaption}>GESTIÓN CLÍNICA</Text>
+              <Text style={[styles.brand, { color: colors.text }]}>DENTALIS</Text>
+              <Text style={[styles.brandCaption, { color: colors.muted }]}>GESTIÓN CLÍNICA</Text>
             </View>
           </View>
-          <View style={styles.clinicCard}>
+          <View style={[styles.clinicCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.clinicIcon}><Text style={styles.clinicGlyph}>✚</Text></View>
             <View style={styles.clinicCopy}>
-              <Text style={styles.clinicTitle}>Clínica Dental</Text>
-              <Text style={styles.clinicSubtitle}>{ROLE_LABELS[role]}</Text>
+              <Text style={[styles.clinicTitle, { color: colors.text }]}>Clínica Dental</Text>
+              <Text style={[styles.clinicSubtitle, { color: colors.muted }]}>{ROLE_LABELS[role]}</Text>
             </View>
             <Text style={styles.chevron}>⌄</Text>
           </View>
           <ScrollView style={styles.sideNav} showsVerticalScrollIndicator={false}>
             {sections.map((section) => (
               <View key={section} style={styles.navSection}>
-                <Text style={styles.sectionLabel}>{section}</Text>
+                <Text style={[styles.sectionLabel, { color: colors.muted }]}>{section}</Text>
                 {menu.filter((item) => item.section === section).map((item) => (
                   <NavItem
                     key={item.route}
@@ -145,16 +159,16 @@ export default function WorkspaceShell({ role, route, navigation, children }) {
             <Text style={styles.logoutIcon}>↪</Text>
             <Text style={styles.logoutText}>Cerrar sesión</Text>
           </TouchableOpacity>
-          <View style={styles.userCard}>
+          <View style={[styles.userCard, { borderTopColor: colors.border }]}>
             <View style={styles.avatar}><Text style={styles.avatarText}>{(user?.nombre || 'U').slice(0, 1).toUpperCase()}</Text></View>
             <View style={styles.userCopy}>
-              <Text numberOfLines={1} style={styles.userName}>{user?.nombre} {user?.apellido}</Text>
-              <Text numberOfLines={1} style={styles.userRole}>{ROLE_LABELS[role]}</Text>
+              <Text numberOfLines={1} style={[styles.userName, { color: colors.text }]}>{user?.nombre} {user?.apellido}</Text>
+              <Text numberOfLines={1} style={[styles.userRole, { color: colors.muted }]}>{ROLE_LABELS[role]}</Text>
             </View>
           </View>
         </View>
       ) : (
-        <View style={styles.mobileHeader}>
+        <View style={[styles.mobileHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.mobileTop}>
             {navigation.canGoBack() ? (
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Volver">
@@ -163,37 +177,47 @@ export default function WorkspaceShell({ role, route, navigation, children }) {
             ) : null}
             <View style={styles.mobileBrandMark}><Text style={styles.brandTooth}>✦</Text></View>
             <View style={styles.mobileTitleWrap}>
-              <Text style={styles.mobileTitle}>{title}</Text>
-              <Text style={styles.mobileRole}>{ROLE_LABELS[role]}</Text>
+              <Text style={[styles.mobileTitle, { color: colors.text }]}>{title}</Text>
+              <Text style={[styles.mobileRole, { color: colors.muted }]}>{ROLE_LABELS[role]}</Text>
             </View>
+            <TouchableOpacity onPress={toggleTheme} style={[styles.themeButton, { backgroundColor: colors.soft }]} accessibilityRole="button" accessibilityLabel={`Cambiar a modo ${mode === 'dark' ? 'claro' : 'oscuro'}`}>
+              <Text style={[styles.themeGlyph, { color: colors.primary }]}>{mode === 'dark' ? '☀' : '☾'}</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleLogout} style={styles.mobileLogout} accessibilityLabel="Cerrar sesión">
               <Text style={styles.logoutIcon}>↪</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mobileNav}>
+          <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.mobileNav}>
             {navigationItems(true)}
           </ScrollView>
         </View>
       )}
 
-      <View style={styles.main}>
+      <View style={[styles.main, { backgroundColor: colors.background }]}>
         {isDesktop && (
-          <View style={styles.topbar}>
-            <View>
+          <View style={[styles.topbar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <View style={styles.topbarHeading}>
+              {navigation.canGoBack() && <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Volver"><Text style={[styles.backGlyph, { color: colors.muted }]}>‹</Text></TouchableOpacity>}
+              <View>
               <Text style={styles.breadcrumb}>DENTALIS  /  {title.toUpperCase()}</Text>
-              <Text style={styles.pageTitle}>{title}</Text>
+              <Text style={[styles.pageTitle, { color: colors.text }]}>{title}</Text>
+              </View>
             </View>
+            <View style={styles.topActions}>
+            <TouchableOpacity onPress={toggleTheme} style={[styles.themeButton, { backgroundColor: colors.soft }]} accessibilityRole="button" accessibilityLabel={`Cambiar a modo ${mode === 'dark' ? 'claro' : 'oscuro'}`}><Text style={[styles.themeGlyph, { color: colors.primary }]}>{mode === 'dark' ? '☀' : '☾'}</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => openRoute('Profile')} style={styles.topProfile}>
               <View style={styles.avatarSmall}><Text style={styles.avatarText}>{(user?.nombre || 'U').slice(0, 1).toUpperCase()}</Text></View>
               <View>
-                <Text style={styles.topUserName}>{user?.nombre} {user?.apellido}</Text>
-                <Text style={styles.topRole}>{ROLE_LABELS[role]}</Text>
+              <Text style={[styles.topUserName, { color: colors.text }]}>{user?.nombre} {user?.apellido}</Text>
+              <Text style={[styles.topRole, { color: colors.muted }]}>{ROLE_LABELS[role]}</Text>
               </View>
               <Text style={styles.chevron}>⌄</Text>
             </TouchableOpacity>
+            </View>
           </View>
         )}
-        <View style={styles.content}>{children}</View>
+        <View style={[styles.content, { backgroundColor: colors.background }]}>{children}</View>
+        {showScrollTop && <TouchableOpacity onPress={() => { scrollToTop(); hideScrollTop(); }} style={[styles.scrollTopButton, { backgroundColor: colors.primary }]} accessibilityRole="button" accessibilityLabel="Volver arriba"><Text style={styles.scrollTopGlyph}>↑</Text></TouchableOpacity>}
       </View>
     </View>
   );
@@ -215,6 +239,7 @@ export function withWorkspace(Screen, roleOverride) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: '#F4F7FB' },
+  rootMobile: { flexDirection: 'column' },
   sidebar: { width: 252, backgroundColor: '#FFFFFF', borderRightWidth: 1, borderRightColor: '#E8EDF4', paddingHorizontal: 18, paddingTop: 24, paddingBottom: 16 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 26, paddingHorizontal: 5 },
   brandMark: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F0FF' },
@@ -249,13 +274,19 @@ const styles = StyleSheet.create({
   userRole: { color: '#8592A7', fontSize: 10, marginTop: 2 },
   main: { flex: 1, minWidth: 0, backgroundColor: '#F4F7FB' },
   topbar: { height: 82, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E8EDF4', paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topbarHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   breadcrumb: { color: '#98A5B9', fontSize: 9, fontWeight: '700', letterSpacing: 1 },
   pageTitle: { color: '#273754', fontSize: 18, fontWeight: '700', marginTop: 5 },
   topProfile: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 7 },
   topUserName: { color: '#34435D', fontSize: 11, fontWeight: '700' },
   topRole: { color: '#8D9AB1', fontSize: 10, marginTop: 3 },
+  themeButton: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  themeGlyph: { fontSize: 19, fontWeight: '700' },
+  scrollTopButton: { position: 'absolute', right: 22, bottom: 22, width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  scrollTopGlyph: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', lineHeight: 29 },
   content: { flex: 1, minHeight: 0 },
-  mobileHeader: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E8EDF4', paddingTop: Platform.OS === 'ios' ? 48 : 12 },
+  mobileHeader: { width: '100%', flexShrink: 0, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E8EDF4', paddingTop: Platform.OS === 'ios' ? 48 : 12 },
   mobileTop: { height: 46, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9 },
   backButton: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   backGlyph: { color: '#536784', fontSize: 32, lineHeight: 34 },
@@ -263,6 +294,8 @@ const styles = StyleSheet.create({
   mobileTitle: { color: '#273754', fontSize: 14, fontWeight: '700' },
   mobileRole: { color: '#8D9AB1', fontSize: 10, marginTop: 2 },
   mobileLogout: { width: 36, alignItems: 'center', justifyContent: 'center' },
-  mobileNav: { paddingHorizontal: 10, paddingVertical: 5, gap: 4 },
-  compactItem: { minHeight: 34, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9 },
+  mobileNav: { paddingHorizontal: 8, paddingVertical: 5, gap: 2 },
+  compactItem: { minHeight: 34, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
+  compactNavIcon: { width: 15, fontSize: 15 },
+  compactNavLabel: { fontSize: 11 },
 });

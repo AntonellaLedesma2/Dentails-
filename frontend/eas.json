@@ -6,11 +6,28 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL_NATIVE": "http://192.168.100.34:3000/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721085208228-eemopnml0qnkhqo6minu53hog4ev4qqa.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "721085208228-b1h229iqgii6865ihlub8847bsg3bn75.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "721085208228-34q0kchuv5om9b5sscrb1i9g7ficfs8o.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GITHUB_CLIENT_ID": "Ov23ct5VVwItyH442s5I",
+        "EXPO_PUBLIC_GITHUB_NATIVE_CLIENT_ID": "Ov23litaHyvsThcrQR8p",
+        "EXPO_PUBLIC_FACEBOOK_APP_ID": "2226433624961976",
+        "EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN": "a7c7f06a950409f7f6feff580efb7e42"
+      }
     },
     "preview": {
       "env": {
-        "EXPO_PUBLIC_API_URL_NATIVE": "http://172.20.10.3:3000/api"
+        "EXPO_PUBLIC_API_URL_NATIVE": "http://192.168.100.34:3000/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721085208228-eemopnml0qnkhqo6minu53hog4ev4qqa.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "721085208228-b1h229iqgii6865ihlub8847bsg3bn75.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "721085208228-34q0kchuv5om9b5sscrb1i9g7ficfs8o.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GITHUB_CLIENT_ID": "Ov23ct5VVwItyH442s5I",
+        "EXPO_PUBLIC_GITHUB_NATIVE_CLIENT_ID": "Ov23litaHyvsThcrQR8p",
+        "EXPO_PUBLIC_FACEBOOK_APP_ID": "2226433624961976",
+        "EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN": "a7c7f06a950409f7f6feff580efb7e42"
       },
       "android": {
         "buildType": "apk"

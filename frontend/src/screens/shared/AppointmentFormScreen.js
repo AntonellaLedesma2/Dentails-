@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import appointmentService from '../../services/appointmentService';
@@ -11,6 +12,7 @@ import Input     from '../../components/Input';
 import Colors    from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../constants/roles';
+import { useAppUi } from '../../context/AppUiContext';
 
 const ESTADOS = ['pendiente', 'confirmado', 'reprogramado', 'cancelado', 'realizado'];
 const ESTADO_LABELS = {
@@ -24,17 +26,34 @@ const EMPTY = {
   duracionMin: 30, motivo: '', notas: '', estado: 'pendiente',
 };
 
+function formatHoraInput(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 4);
+  return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+}
+
 export default function AppointmentFormScreen({ route, navigation }) {
   const { user } = useAuth();
-  const { mode, appointmentId, fecha: fechaDefault } = route.params;
+  const { colors } = useAppUi();
+  const { mode = 'create', appointmentId, fecha: fechaDefault } = route?.params || {};
   const isEdit = mode === 'edit';
+  const isDentist = user?.rol === ROLES.ODONTOLOGO;
 
   const [form, setForm]         = useState({ ...EMPTY, fecha: fechaDefault || '' });
   const [patients, setPatients] = useState([]);
+  const [allPatients, setAllPatients] = useState([]);
+  const [patientSearch, setPatientSearch] = useState('');
+  const [patientResults, setPatientResults] = useState([]);
+  const [patientSearchLoading, setPatientSearchLoading] = useState(false);
+  const [patientSearchError, setPatientSearchError] = useState('');
+  const [doctorSearch, setDoctorSearch] = useState('');
   const [odontologos, setOdontologos] = useState([]);
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(true);
   const [initialEstado, setInitialEstado] = useState('pendiente');
+  const normalizedDoctorQuery = doctorSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const filteredDentists = odontologos.filter((doctor) =>
+    `${doctor.nombre} ${doctor.apellido}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(normalizedDoctorQuery)
+  );
 
   // Cargar listas de pacientes y odontólogos
   useEffect(() => {
@@ -42,10 +61,12 @@ export default function AppointmentFormScreen({ route, navigation }) {
       try {
         const [pats, users] = await Promise.all([
           patientService.getAll(),
-          userService.getAll(),
+          isDentist ? Promise.resolve([user]) : userService.getDentists(),
         ]);
         setPatients(pats);
-        setOdontologos(users.filter((u) => u.rol === 'odontologo' && u.estado === 'activo'));
+        setAllPatients(pats);
+        setOdontologos(users);
+        if (isDentist && !isEdit) setForm((current) => ({ ...current, odontologoId: String(user.id) }));
 
         if (isEdit) {
           const appt = await appointmentService.getById(appointmentId);
@@ -69,10 +90,37 @@ export default function AppointmentFormScreen({ route, navigation }) {
       }
     }
     loadData();
-  }, [isEdit, appointmentId]);
+  }, [isEdit, appointmentId, navigation, isDentist, user]);
+
+  useEffect(() => {
+    const query = patientSearch.trim();
+    if (!query) return undefined;
+    let active = true;
+    const timer = setTimeout(async () => {
+      setPatientSearchLoading(true);
+      setPatientSearchError('');
+      try {
+        const matches = await patientService.getAll(query);
+        if (active) setPatientResults(matches);
+      } catch (err) {
+        if (active) setPatientSearchError(err.response?.data?.message || 'No se pudo buscar pacientes.');
+      } finally {
+        if (active) setPatientSearchLoading(false);
+      }
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [patientSearch]);
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handlePatientSearch(value) {
+    setPatientSearch(value);
+    setPatientResults([]);
+    if (!value.trim()) {
+      setPatientSearchError('');
+    }
   }
 
   function validate() {
@@ -84,7 +132,9 @@ export default function AppointmentFormScreen({ route, navigation }) {
       Alert.alert('Error', 'La fecha debe tener formato AAAA-MM-DD');
       return false;
     }
-    if (!/^\d{2}:\d{2}$/.test(form.hora)) {
+    const normalizedTime = formatHoraInput(form.hora);
+    const timeMatch = normalizedTime.match(/^(\d{2}):(\d{2})$/);
+    if (!timeMatch || Number(timeMatch[1]) > 23 || Number(timeMatch[2]) > 59) {
       Alert.alert('Error', 'La hora debe tener formato HH:MM');
       return false;
     }
@@ -99,7 +149,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
         pacienteId:   parseInt(form.pacienteId),
         odontologoId: parseInt(form.odontologoId),
         fecha:        form.fecha,
-        hora:         form.hora,
+        hora:         formatHoraInput(form.hora),
         duracionMin:  form.duracionMin,
         motivo:       form.motivo || null,
         notas:        form.notas  || null,
@@ -108,10 +158,10 @@ export default function AppointmentFormScreen({ route, navigation }) {
       if (isEdit) {
         await appointmentService.update(appointmentId, payload);
         if (initialEstado !== form.estado) await appointmentService.changeEstado(appointmentId, form.estado);
-        Alert.alert('Éxito', 'Turno actualizado', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        navigation.goBack();
       } else {
-        await appointmentService.create({ ...payload, estado: form.estado });
-        Alert.alert('Éxito', 'Turno creado correctamente', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        await appointmentService.create({ ...payload, estado: isDentist ? 'pendiente' : form.estado });
+        navigation.goBack();
       }
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'No se pudo guardar el turno');
@@ -126,33 +176,41 @@ export default function AppointmentFormScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <TrackedScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+
+        <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Volver atrás">
+          <Text style={[styles.backText, { color: colors.primary }]}>‹  Volver</Text>
+        </TouchableOpacity>
 
         {/* Paciente */}
         <Text style={styles.sectionLabel}>PACIENTE</Text>
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>Seleccioná el paciente *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
-            {patients.map((p) => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.selectorChip, String(p.id) === form.pacienteId && styles.selectorChipActive]}
-                onPress={() => set('pacienteId', String(p.id))}
-              >
-                <Text style={[styles.selectorText, String(p.id) === form.pacienteId && styles.selectorTextActive]}>
-                  {p.apellido}, {p.nombre}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <Text style={styles.fieldLabel}>Buscá por nombre, apellido, teléfono, DNI, correo u otro dato *</Text>
+          <Input value={patientSearch} onChangeText={handlePatientSearch} placeholder="Ej: Ana, 0981..., DNI, obra social..." leftIcon="🔎" autoCapitalize="none" />
+          {patientSearchLoading && <ActivityIndicator color={colors.primary} style={styles.searchSpinner} />}
+          {patientSearchError ? <Text style={styles.searchError}>{patientSearchError}</Text> : null}
+          {!!patientSearch.trim() && !patientSearchLoading && !patientSearchError && patientResults.length === 0 && <Text style={styles.emptyMsg}>No se encontraron pacientes con esos datos.</Text>}
+          {!!patientSearch.trim() && patientResults.slice(0, 8).map((p) => (
+            <TouchableOpacity key={p.id} style={[styles.searchResult, { backgroundColor: colors.background, borderColor: String(p.id) === form.pacienteId ? colors.primary : colors.border }]} onPress={() => { set('pacienteId', String(p.id)); setPatientSearch(p.nombre + ' ' + p.apellido); }}>
+              <View style={styles.resultCopy}>
+                <Text style={[styles.resultName, { color: colors.text }]}>{p.apellido}, {p.nombre}</Text>
+                <Text style={[styles.resultMeta, { color: colors.muted }]}>{[p.telefono, p.dni, p.correo, p.obra_social].filter(Boolean).join(' · ') || 'Sin datos de contacto adicionales'}</Text>
+              </View>
+              <Text style={[styles.resultCheck, { color: colors.primary }]}>{String(p.id) === form.pacienteId ? '✓' : '+'}</Text>
+            </TouchableOpacity>
+          ))}
+          {!!form.pacienteId && <Text style={[styles.selectedSummary, { color: colors.primary }]}>{(() => { const selected = allPatients.find((p) => String(p.id) === form.pacienteId) || patientResults.find((p) => String(p.id) === form.pacienteId); return selected ? `Seleccionado: ${selected.apellido}, ${selected.nombre}` : 'Paciente seleccionado'; })()}</Text>}
+          {patients.length === 0 && <Text style={styles.emptyMsg}>No hay pacientes activos. Creá el paciente antes de agendar.</Text>}
         </View>
 
         {/* Odontólogo */}
-        <Text style={styles.sectionLabel}>ODONTÓLOGO</Text>
+        {!isDentist && <Text style={styles.sectionLabel}>ODONTÓLOGO</Text>}
+        {!isDentist &&
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>Seleccioná el odontólogo *</Text>
+          <Text style={styles.fieldLabel}>Buscá y seleccioná el odontólogo *</Text>
+          <Input value={doctorSearch} onChangeText={setDoctorSearch} placeholder="Nombre o apellido del odontólogo" leftIcon="🔎" autoCapitalize="none" />
           <View style={styles.chipRow}>
-            {odontologos.map((o) => (
+            {filteredDentists.map((o) => (
               <TouchableOpacity
                 key={o.id}
                 style={[styles.chip, String(o.id) === form.odontologoId && styles.chipActive]}
@@ -166,8 +224,11 @@ export default function AppointmentFormScreen({ route, navigation }) {
             {odontologos.length === 0 && (
               <Text style={styles.emptyMsg}>No hay odontólogos activos</Text>
             )}
+            {odontologos.length > 0 && filteredDentists.length === 0 && (
+              <Text style={styles.emptyMsg}>No se encontraron odontólogos con ese nombre.</Text>
+            )}
           </View>
-        </View>
+        </View>}
 
         {/* Fecha y hora */}
         <Text style={styles.sectionLabel}>FECHA Y HORA</Text>
@@ -182,9 +243,10 @@ export default function AppointmentFormScreen({ route, navigation }) {
           <Input
             label="Hora * (HH:MM)"
             value={form.hora}
-            onChangeText={(v) => set('hora', v)}
-            placeholder="09:00"
+            onChangeText={(v) => set('hora', formatHoraInput(v))}
+            placeholder="0900"
             keyboardType="numeric"
+            hint="Ingresá 4 números, por ejemplo 0900; se mostrará 09:00."
           />
 
           <Text style={styles.fieldLabel}>Duración</Text>
@@ -223,7 +285,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
         </View>
 
         {/* Estado (solo edición) */}
-        {isEdit && (
+        {isEdit && user?.rol === ROLES.ADMINISTRADOR && (
           <>
             <Text style={styles.sectionLabel}>ESTADO</Text>
             <View style={styles.section}>
@@ -251,7 +313,7 @@ export default function AppointmentFormScreen({ route, navigation }) {
           size="lg"
           style={styles.submitBtn}
         />
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -260,6 +322,8 @@ const styles = StyleSheet.create({
   flex:    { flex: 1, backgroundColor: Colors.background },
   centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { padding: 16, paddingBottom: 40 },
+  backRow: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 14 },
+  backText: { fontSize: 16, fontWeight: '700' },
 
   sectionLabel: {
     fontSize: 11, fontWeight: '700', color: Colors.text.label,
@@ -287,6 +351,14 @@ const styles = StyleSheet.create({
   selectorChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   selectorText:       { fontSize: 13, color: Colors.text.secondary },
   selectorTextActive: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  searchResult: { minHeight: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderRadius: 10, marginBottom: 7 },
+  resultCopy: { flex: 1, paddingRight: 8 },
+  resultName: { fontSize: 14, fontWeight: '700' },
+  resultMeta: { fontSize: 11, marginTop: 3 },
+  resultCheck: { fontSize: 18, fontWeight: '800', paddingHorizontal: 5 },
+  selectedSummary: { fontSize: 12, fontWeight: '700', marginTop: 6 },
+  searchSpinner: { marginVertical: 10 },
+  searchError: { color: Colors.error, fontSize: 12, marginBottom: 8 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   chip: {

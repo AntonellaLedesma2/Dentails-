@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import treatmentService from '../../services/treatmentService';
 import treatmentCatalogService from '../../services/treatmentCatalogService';
 import patientService   from '../../services/patientService';
-import userService      from '../../services/userService';
 import Button  from '../../components/Button';
 import Input   from '../../components/Input';
 import Colors  from '../../constants/colors';
@@ -58,7 +58,7 @@ export default function TreatmentFormScreen({ route, navigation }) {
       }
     }
     load();
-  }, [isEdit, treatmentId]);
+}, [isEdit, treatmentId, navigation]);
 
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
 
@@ -101,11 +101,11 @@ export default function TreatmentFormScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <TrackedScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         <Text style={styles.sectionLabel}>PACIENTE</Text>
         <View style={styles.section}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TrackedScrollView horizontal showsHorizontalScrollIndicator={false}>
             {patients.map((p) => (
               <TouchableOpacity
                 key={p.id}
@@ -117,7 +117,7 @@ export default function TreatmentFormScreen({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </TrackedScrollView>
         </View>
 
         <Text style={styles.sectionLabel}>TRATAMIENTO</Text>
@@ -125,13 +125,13 @@ export default function TreatmentFormScreen({ route, navigation }) {
           {!isEdit && catalog.length > 0 && (
             <>
               <Text style={styles.catalogHint}>Elegí una prestación para completar descripción y precio sugerido.</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <TrackedScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                 {catalog.map((item) => (
                   <TouchableOpacity key={item.id} style={[styles.chip, form.descripcion === item.nombre && styles.chipActive]} onPress={() => setForm((f) => ({ ...f, descripcion: item.nombre, costoTotal: String(item.precio) }))}>
                     <Text style={[styles.chipText, form.descripcion === item.nombre && styles.chipTextActive]}>{item.nombre} · Gs. {Number(item.precio).toLocaleString('es-PY')}</Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </TrackedScrollView>
             </>
           )}
           <Input
@@ -182,7 +182,7 @@ export default function TreatmentFormScreen({ route, navigation }) {
           size="lg"
           style={styles.submitBtn}
         />
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }

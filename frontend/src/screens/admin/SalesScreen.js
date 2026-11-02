@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { TrackedFlatList } from '../../components/TrackedScroll';
+import { ActivityIndicator, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Card from '../../components/Card';
 import paymentService from '../../services/paymentService';
 import Colors from '../../constants/colors';
+import { useAppUi } from '../../context/AppUiContext';
 
 const methodLabel = { efectivo: 'Efectivo', tarjeta_debito: 'Tarjeta de débito', tarjeta_credito: 'Tarjeta de crédito', transferencia: 'Transferencia', obra_social: 'Obra social' };
 const money = (v) => `Gs. ${Number(v || 0).toLocaleString('es-PY')}`;
 
 export default function SalesScreen() {
+  const { colors } = useAppUi();
   const [payments, setPayments] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,32 +22,38 @@ export default function SalesScreen() {
     } catch { /* La lista permanece vacía y se puede actualizar deslizando. */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    void load();
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [load]);
 
   if (loading) return <View style={s.centered}><ActivityIndicator color={Colors.primary} size="large" /></View>;
   return (
-    <FlatList
-      style={s.container} contentContainerStyle={s.content} data={payments}
+    <TrackedFlatList
+      style={[s.container, { backgroundColor: colors.background }]} contentContainerStyle={s.content} data={payments}
       keyExtractor={(item) => String(item.id)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       ListHeaderComponent={(
         <>
-          <Text style={s.eyebrow}>ADMINISTRACIÓN FINANCIERA</Text>
-          <Text style={s.title}>Ventas</Text>
+          <Text style={[s.eyebrow, { color: colors.muted }]}>ADMINISTRACIÓN FINANCIERA</Text>
+          <Text style={[s.title, { color: colors.text }]}>Ventas</Text>
           <View style={s.totalCard}><Text style={s.totalLabel}>Ingresos cobrados este mes</Text><Text style={s.totalValue}>{money(summary?.totales?.total_mes)}</Text><Text style={s.totalMeta}>{summary?.totales?.cantidad_pagos || 0} pagos registrados</Text></View>
-          <Text style={s.sectionTitle}>MOVIMIENTOS RECIENTES</Text>
+          <Text style={[s.sectionTitle, { color: colors.muted }]}>MOVIMIENTOS RECIENTES</Text>
         </>
       )}
       renderItem={({ item }) => (
         <Card style={s.rowCard}>
           <View style={s.row}>
             <View style={s.initials}><Text style={s.initialsText}>{(item.paciente_nombre || 'P')[0]}</Text></View>
-            <View style={s.copy}><Text style={s.patient}>{item.paciente_nombre || 'Paciente'}</Text><Text style={s.meta}>{item.tratamiento_desc || methodLabel[item.metodo] || item.metodo} · {item.odontologo_nombre || 'Clínica'}</Text><Text style={s.date}>{new Date(item.fecha).toLocaleDateString('es-PY')}</Text></View>
+            <View style={s.copy}><Text style={[s.patient, { color: colors.text }]}>{item.paciente_nombre || 'Paciente'}</Text><Text style={[s.meta, { color: colors.muted }]}>{item.tratamiento_desc || methodLabel[item.metodo] || item.metodo} · {item.odontologo_nombre || 'Clínica'}</Text><Text style={[s.date, { color: colors.muted }]}>{new Date(item.fecha).toLocaleDateString('es-PY')}</Text></View>
             <Text style={s.amount}>{money(item.importe)}</Text>
           </View>
         </Card>
       )}
-      ListEmptyComponent={<Text style={s.empty}>Todavía no hay ventas registradas.</Text>}
+      ListEmptyComponent={<Text style={[s.empty, { color: colors.muted }]}>Todavía no hay ventas registradas.</Text>}
     />
   );
 }

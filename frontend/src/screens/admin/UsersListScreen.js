@@ -1,20 +1,28 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, ActivityIndicator, RefreshControl, TextInput,
+  View, Text, StyleSheet, TouchableOpacity,
+  Alert, ActivityIndicator, RefreshControl, TextInput, Modal,
 } from 'react-native';
 import userService from '../../services/userService';
 import RoleBadge from '../../components/RoleBadge';
 import StatusBadge from '../../components/StatusBadge';
 import Button from '../../components/Button';
 import Colors from '../../constants/colors';
+import { useAuth } from '../../context/AuthContext';
+import { useAppUi } from '../../context/AppUiContext';
 
 export default function UsersListScreen({ navigation, roleFilter, hideCreate = false }) {
+  const { user: currentUser } = useAuth();
+  const { colors } = useAppUi();
   const [users, setUsers]         = useState([]);
   const [filtered, setFiltered]   = useState([]);
   const [search, setSearch]       = useState('');
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState('');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -31,9 +39,9 @@ export default function UsersListScreen({ navigation, roleFilter, hideCreate = f
   }, [roleFilter]);
 
   useEffect(() => {
-    fetchUsers();
+    const initialLoad = setTimeout(fetchUsers, 0);
     const unsub = navigation.addListener('focus', fetchUsers);
-    return unsub;
+    return () => { clearTimeout(initialLoad); unsub(); };
   }, [fetchUsers, navigation]);
 
   function handleSearch(text) {
@@ -50,25 +58,23 @@ export default function UsersListScreen({ navigation, roleFilter, hideCreate = f
 
   async function toggleEstado(user) {
     const nuevo = user.estado === 'activo' ? 'inactivo' : 'activo';
-    Alert.alert(
-      `${nuevo === 'inactivo' ? 'Desactivar' : 'Activar'} usuario`,
-      `¿Confirmás ${nuevo === 'inactivo' ? 'desactivar' : 'activar'} a ${user.nombre} ${user.apellido}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          style: nuevo === 'inactivo' ? 'destructive' : 'default',
-          onPress: async () => {
-            try {
-              await userService.update(user.id, { estado: nuevo });
-              fetchUsers();
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || 'No se pudo actualizar');
-            }
-          },
-        },
-      ]
-    );
+    setStatusError('');
+    setStatusTarget({ ...user, nextStatus: nuevo });
+  }
+
+  async function confirmStatusChange() {
+    if (!statusTarget) return;
+    setStatusLoading(true);
+    setStatusError('');
+    try {
+      await userService.update(statusTarget.id, { estado: statusTarget.nextStatus });
+      setStatusTarget(null);
+      await fetchUsers();
+    } catch (err) {
+      setStatusError(err.response?.data?.message || 'No se pudo actualizar el estado del usuario.');
+    } finally {
+      setStatusLoading(false);
+    }
   }
 
   function renderUser({ item }) {
@@ -100,6 +106,8 @@ export default function UsersListScreen({ navigation, roleFilter, hideCreate = f
           <TouchableOpacity
             style={[styles.actionBtn, item.estado === 'activo' ? styles.deactivateBtn : styles.activateBtn]}
             onPress={() => toggleEstado(item)}
+            disabled={String(item.id) === String(currentUser?.id)}
+            accessibilityState={{ disabled: String(item.id) === String(currentUser?.id) }}
           >
             <Text style={styles.actionIcon}>{item.estado === 'activo' ? '🚫' : '✅'}</Text>
           </TouchableOpacity>
@@ -135,7 +143,7 @@ export default function UsersListScreen({ navigation, roleFilter, hideCreate = f
         {filtered.length} {roleFilter === 'odontologo' ? (filtered.length === 1 ? 'odontólogo' : 'odontólogos') : (filtered.length === 1 ? 'usuario' : 'usuarios')}
       </Text>
 
-      <FlatList
+      <TrackedFlatList
         data={filtered}
         keyExtractor={(u) => String(u.id)}
         renderItem={renderUser}
@@ -163,6 +171,24 @@ export default function UsersListScreen({ navigation, roleFilter, hideCreate = f
       >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>}
+
+      <Modal visible={Boolean(statusTarget)} transparent animationType="fade" onRequestClose={() => !statusLoading && setStatusTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{statusTarget?.nextStatus === 'inactivo' ? 'Desactivar usuario' : 'Activar usuario'}</Text>
+            <Text style={[styles.modalMessage, { color: colors.muted }]}>
+              {statusTarget?.nextStatus === 'inactivo'
+                ? `¿Querés desactivar a ${statusTarget?.nombre} ${statusTarget?.apellido}? Ya no podrá iniciar sesión, pero su historial quedará conservado.`
+                : `¿Querés volver a activar a ${statusTarget?.nombre} ${statusTarget?.apellido}?`}
+            </Text>
+            {statusError ? <Text style={styles.modalError}>{statusError}</Text> : null}
+            <View style={styles.modalActions}>
+              <Button title="Volver" variant="outline" onPress={() => setStatusTarget(null)} disabled={statusLoading} style={styles.modalButton} />
+              <Button title={statusTarget?.nextStatus === 'inactivo' ? 'Sí, desactivar' : 'Sí, activar'} onPress={confirmStatusChange} loading={statusLoading} style={styles.modalButton} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -264,4 +290,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabIcon: { fontSize: 26, color: Colors.white, lineHeight: 30 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(8,15,28,0.56)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 440, borderRadius: 18, borderWidth: 1, padding: 22 },
+  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 8 },
+  modalMessage: { fontSize: 14, lineHeight: 21 },
+  modalError: { color: '#C53E4B', fontSize: 13, marginTop: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20 },
+  modalButton: { minWidth: 120 },
 });

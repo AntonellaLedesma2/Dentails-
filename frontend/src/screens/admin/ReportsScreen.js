@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { TrackedScrollView } from '../../components/TrackedScroll';
+import { ActivityIndicator, RefreshControl, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import paymentService from '../../services/paymentService';
 import Colors from '../../constants/colors';
+import { useAppUi } from '../../context/AppUiContext';
 
 const money = (value) => `Gs. ${Number(value || 0).toLocaleString('es-PY')}`;
 const STATUS = {
@@ -19,11 +21,13 @@ function MiniBars({ rows, valueKey, dark = false }) {
   })}</View>;
 }
 
-function Panel({ title, subtitle, children, style }) {
-  return <View style={[s.panel, style]}><View style={s.panelHead}><Text style={s.panelTitle}>{title}</Text>{subtitle ? <Text style={s.panelSub}>{subtitle}</Text> : null}</View>{children}</View>;
+function Panel({ title, subtitle, children, style, dark = false }) {
+  const { colors } = useAppUi();
+  return <View style={[s.panel, { backgroundColor: dark ? '#22365A' : colors.surface, borderColor: colors.border }, style]}><View style={s.panelHead}><Text style={[s.panelTitle, { color: dark ? '#FFFFFF' : colors.text }]}>{title}</Text>{subtitle ? <Text style={[s.panelSub, { color: dark ? '#C5D2E6' : colors.muted }]}>{subtitle}</Text> : null}</View>{children}</View>;
 }
 
 export default function ReportsScreen({ navigation }) {
+  const { colors } = useAppUi();
   const { width } = useWindowDimensions();
   const desktop = width >= 980;
   const [summary, setSummary] = useState(null);
@@ -37,16 +41,21 @@ export default function ReportsScreen({ navigation }) {
     } catch { /* El panel muestra estados vacíos hasta que la API responda. */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { loadData(); }, [loadData]);
-  if (loading) return <View style={s.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
+useEffect(() => {
+  const timer = setTimeout(() => {
+    void loadData();
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [loadData]);  if (loading) return <View style={s.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
   const metrics = summary?.metricas || {};
   const states = summary?.estadosTurno || [];
   const stateTotal = states.reduce((total, item) => total + Number(item.total || 0), 0);
   const today = new Date().toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
-      <View style={s.header}><View style={{ flex: 1 }}><Text style={s.eyebrow}>DENTALIS · VISIÓN DE CLÍNICA</Text><Text style={s.title}>Dashboard general</Text><Text style={s.subtitle}>{today.charAt(0).toUpperCase() + today.slice(1)} · indicadores actualizados desde la base de datos</Text></View><TouchableOpacity style={s.headerAction} onPress={() => navigation.navigate('Agenda')}><Text style={s.headerActionText}>▣  Ver agenda</Text></TouchableOpacity></View>
+    <TrackedScrollView style={[s.container, { backgroundColor: colors.background }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      <View style={s.header}><View style={{ flex: 1 }}><Text style={[s.eyebrow, { color: colors.muted }]}>DENTALIS · VISIÓN DE CLÍNICA</Text><Text style={[s.title, { color: colors.text }]}>Dashboard general</Text><Text style={[s.subtitle, { color: colors.muted }]}>{today.charAt(0).toUpperCase() + today.slice(1)} · indicadores actualizados desde la base de datos</Text></View><TouchableOpacity style={s.headerAction} onPress={() => navigation.navigate('Agenda')}><Text style={s.headerActionText}>▣  Ver agenda</Text></TouchableOpacity></View>
 
       <View style={[s.kpis, desktop && s.kpisWide]}>
         {[
@@ -54,11 +63,11 @@ export default function ReportsScreen({ navigation }) {
           ['Turnos de hoy', metrics.turnos_hoy ?? '—', '▣', '#E7F7F0', '#208260'],
           ['Odontólogos', metrics.odontologos ?? '—', '♙', '#F1EDFF', '#7658C9'],
           ['Cobrado este mes', money(summary?.totales?.total_mes), '$', '#FFF5DF', '#B77B18'],
-        ].map(([label, value, icon, bg, color]) => <View key={label} style={s.kpi}><View style={[s.kpiIcon, { backgroundColor: bg }]}><Text style={[s.kpiGlyph, { color }]}>{icon}</Text></View><Text style={s.kpiLabel}>{label}</Text><Text style={s.kpiValue}>{value}</Text></View>)}
+        ].map(([label, value, icon, bg, color]) => <View key={label} style={[s.kpi, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[s.kpiIcon, { backgroundColor: bg }]}><Text style={[s.kpiGlyph, { color }]}>{icon}</Text></View><Text style={[s.kpiLabel, { color: colors.muted }]}>{label}</Text><Text style={[s.kpiValue, { color: colors.text }]}>{value}</Text></View>)}
       </View>
 
       <View style={[s.rowPanels, desktop && s.rowDesktop]}>
-        <Panel title="Flujo de caja" subtitle="Cobros de los últimos seis meses" style={[s.cashPanel, desktop && s.cashPanelWide]}>
+        <Panel title="Flujo de caja" subtitle="Cobros de los últimos seis meses" dark style={[s.cashPanel, desktop && s.cashPanelWide]}>
           <View style={s.cashTotal}><Text style={s.cashLabel}>TOTAL COBRADO ESTE MES</Text><Text style={s.cashValue}>{money(summary?.totales?.total_mes)}</Text><Text style={s.cashCaption}>{summary?.totales?.cantidad_pagos || 0} movimientos registrados</Text></View>
           <MiniBars rows={(summary?.porMes || []).slice(-6)} valueKey="total" dark />
         </Panel>
@@ -67,12 +76,12 @@ export default function ReportsScreen({ navigation }) {
             {Object.entries(STATUS).map(([key, [label, color, bg]]) => {
               const count = Number(states.find((item) => item.estado === key)?.total || 0);
               const percent = stateTotal ? Math.round((count / stateTotal) * 100) : 0;
-              return <View key={key} style={s.statusRow}><View style={[s.statusIcon, { backgroundColor: bg }]}><View style={[s.statusDot, { backgroundColor: color }]} /></View><Text style={s.statusName}>{label}</Text><View style={s.progressTrack}><View style={[s.progress, { width: `${percent}%`, backgroundColor: color }]} /></View><Text style={s.statusCount}>{count}</Text></View>;
+              return <View key={key} style={s.statusRow}><View style={[s.statusIcon, { backgroundColor: bg }]}><View style={[s.statusDot, { backgroundColor: color }]} /></View><Text style={[s.statusName, { color: colors.text }]}>{label}</Text><View style={s.progressTrack}><View style={[s.progress, { width: `${percent}%`, backgroundColor: color }]} /></View><Text style={[s.statusCount, { color: colors.text }]}>{count}</Text></View>;
             })}
-            <View style={s.summaryFoot}><Text style={s.footLabel}>Turnos del mes</Text><Text style={s.footValue}>{metrics.turnos_mes ?? 0}</Text></View>
+            <View style={[s.summaryFoot, { borderTopColor: colors.border }]}><Text style={[s.footLabel, { color: colors.muted }]}>Turnos del mes</Text><Text style={[s.footValue, { color: colors.text }]}>{metrics.turnos_mes ?? 0}</Text></View>
           </Panel>
           <Panel title="Equipo odontológico" subtitle="Cobros acumulados por profesional">
-            {odontologos.slice(0, 4).map((item) => <View key={item.odontologo_id} style={s.doctorRow}><View style={s.doctorAvatar}><Text style={s.doctorInitial}>{item.odontologo_nombre?.[0] || 'O'}</Text></View><View style={{ flex: 1 }}><Text style={s.doctorName}>Dr/a. {item.odontologo_nombre}</Text><Text style={s.doctorMeta}>{item.total_pacientes} pacientes asignados</Text></View><Text style={s.doctorTotal}>{money(item.total_cobrado)}</Text></View>)}
+            {odontologos.slice(0, 4).map((item) => <View key={item.odontologo_id} style={[s.doctorRow, { borderTopColor: colors.border }]}><View style={s.doctorAvatar}><Text style={s.doctorInitial}>{item.odontologo_nombre?.[0] || 'O'}</Text></View><View style={{ flex: 1 }}><Text style={[s.doctorName, { color: colors.text }]}>Dr/a. {item.odontologo_nombre}</Text><Text style={[s.doctorMeta, { color: colors.muted }]}>{item.total_pacientes} pacientes asignados</Text></View><Text style={s.doctorTotal}>{money(item.total_cobrado)}</Text></View>)}
             {!odontologos.length && <Text style={s.muted}>Aún no hay odontólogos registrados.</Text>}
           </Panel>
         </View>
@@ -81,23 +90,23 @@ export default function ReportsScreen({ navigation }) {
       <View style={[s.rowPanels, desktop && s.rowDesktop]}>
         <Panel title="Citas por mes" subtitle="Volumen de atención de los últimos seis meses" style={[s.equalPanel, desktop && s.equalPanelWide]}><MiniBars rows={(summary?.turnosPorMes || []).slice(-6)} valueKey="total" /><View style={s.legend}><View style={[s.legendDot, { backgroundColor: '#3973D8' }]} /><Text style={s.legendText}>Turnos programados</Text><View style={[s.legendDot, { backgroundColor: '#28A478' }]} /><Text style={s.legendText}>Incluye los realizados</Text></View></Panel>
         <Panel title="Próximas reservaciones" subtitle={`${metrics.proximos_turnos ?? 0} pendientes o confirmadas`} style={[s.equalPanel, desktop && s.equalPanelWide]}>
-          {(summary?.proximosTurnos || []).slice(0, 5).map((item) => <View key={item.id} style={s.appointmentRow}><View style={s.datePill}><Text style={s.dateDay}>{String(item.fecha).slice(8, 10)}</Text><Text style={s.dateMonth}>{String(item.fecha).slice(5, 7)}</Text></View><View style={{ flex: 1 }}><Text style={s.appointmentPatient}>{item.paciente_nombre}</Text><Text style={s.appointmentMeta}>{item.odontologo_nombre} · {String(item.hora).slice(0, 5)}</Text></View><Text style={[s.appointmentState, item.estado === 'confirmado' && { color: '#208260', backgroundColor: '#E7F7F0' }]}>{item.estado}</Text></View>)}
+          {(summary?.proximosTurnos || []).slice(0, 5).map((item) => <View key={item.id} style={[s.appointmentRow, { borderTopColor: colors.border }]}><View style={s.datePill}><Text style={s.dateDay}>{String(item.fecha).slice(8, 10)}</Text><Text style={s.dateMonth}>{String(item.fecha).slice(5, 7)}</Text></View><View style={{ flex: 1 }}><Text style={[s.appointmentPatient, { color: colors.text }]}>{item.paciente_nombre}</Text><Text style={[s.appointmentMeta, { color: colors.muted }]}>{item.odontologo_nombre} · {String(item.hora).slice(0, 5)}</Text></View><Text style={[s.appointmentState, item.estado === 'confirmado' && { color: '#208260', backgroundColor: '#E7F7F0' }]}>{item.estado}</Text></View>)}
           {!summary?.proximosTurnos?.length && <Text style={s.muted}>No hay turnos próximos registrados.</Text>}
         </Panel>
       </View>
 
       <View style={[s.rowPanels, desktop && s.rowDesktop]}>
         <Panel title="Tratamientos más frecuentes" subtitle="Planes registrados por el equipo" style={[s.equalPanel, desktop && s.equalPanelWide]}>
-          {(summary?.topTratamientos || []).map((item, index) => <View key={item.nombre} style={s.topTreatment}><View style={s.rank}><Text style={s.rankText}>{index + 1}</Text></View><View style={{ flex: 1 }}><Text style={s.topName}>{item.nombre}</Text><Text style={s.topMeta}>{item.cantidad} tratamientos</Text></View><Text style={s.topValue}>{money(item.valor)}</Text></View>)}
+          {(summary?.topTratamientos || []).map((item, index) => <View key={item.nombre} style={[s.topTreatment, { borderTopColor: colors.border }]}><View style={s.rank}><Text style={s.rankText}>{index + 1}</Text></View><View style={{ flex: 1 }}><Text style={[s.topName, { color: colors.text }]}>{item.nombre}</Text><Text style={[s.topMeta, { color: colors.muted }]}>{item.cantidad} tratamientos</Text></View><Text style={s.topValue}>{money(item.valor)}</Text></View>)}
           {!summary?.topTratamientos?.length && <Text style={s.muted}>Sin tratamientos cargados todavía.</Text>}
         </Panel>
         <Panel title="Métodos de pago" subtitle="Cobros registrados este mes" style={[s.equalPanel, desktop && s.equalPanelWide]}>
-          {(summary?.porMetodo || []).map((item) => <View key={item.metodo} style={s.methodRow}><Text style={s.methodName}>{({ efectivo: 'Efectivo', tarjeta_debito: 'Tarjeta débito', tarjeta_credito: 'Tarjeta crédito', transferencia: 'Transferencia', obra_social: 'Obra social' })[item.metodo] || item.metodo}</Text><Text style={s.methodCount}>{item.cantidad} pagos</Text><Text style={s.methodTotal}>{money(item.total)}</Text></View>)}
+          {(summary?.porMetodo || []).map((item) => <View key={item.metodo} style={[s.methodRow, { borderTopColor: colors.border }]}><Text style={[s.methodName, { color: colors.text }]}>{({ efectivo: 'Efectivo', tarjeta_debito: 'Tarjeta débito', tarjeta_credito: 'Tarjeta crédito', transferencia: 'Transferencia', obra_social: 'Obra social' })[item.metodo] || item.metodo}</Text><Text style={[s.methodCount, { color: colors.muted }]}>{item.cantidad} pagos</Text><Text style={s.methodTotal}>{money(item.total)}</Text></View>)}
           {!summary?.porMetodo?.length && <Text style={s.muted}>No hay cobros registrados este mes.</Text>}
           <View style={s.summaryFoot}><Text style={s.footLabel}>Tratamientos activos</Text><Text style={s.footValue}>{metrics.tratamientos_activos ?? 0}</Text></View>
         </Panel>
       </View>
-    </ScrollView>
+    </TrackedScrollView>
   );
 }
 

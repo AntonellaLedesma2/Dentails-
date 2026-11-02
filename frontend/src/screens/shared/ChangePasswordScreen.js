@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, ScrollView,
+  StyleSheet, Alert, KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import userService from '../../services/userService';
 import Button from '../../components/Button';
@@ -47,7 +48,7 @@ export default function ChangePasswordScreen({ navigation }) {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <TrackedScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Input
           label="Contraseña actual"
           value={form.current}
@@ -70,7 +71,7 @@ export default function ChangePasswordScreen({ navigation }) {
           secureTextEntry
         />
         <Button title="Cambiar contraseña" onPress={handleChange} loading={loading} />
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }

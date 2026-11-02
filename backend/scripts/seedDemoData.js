@@ -19,6 +19,30 @@ const patients = [
   ['Zoe', 'Mendoza', 'F', '0971000011'], ['Dylan', 'Ortiz', 'M', '0971000012'],
   ['Abril', 'Pereira', 'F', '0971000013'], ['Lautaro', 'Ramírez', 'M', '0971000014'],
   ['Julieta', 'Villalba', 'F', '0971000015'],
+  ['Sofía', 'Benítez', 'F', '0971000016'], ['Tobías', 'Cáceres', 'M', '0971000017'],
+  ['Martina', 'Duarte', 'F', '0971000018'], ['Franco', 'Escobar', 'M', '0971000019'],
+  ['Olivia', 'Fernández', 'F', '0971000020'], ['Matías', 'Galeano', 'M', '0971000021'],
+  ['Catalina', 'Herrera', 'F', '0971000022'], ['Iñaki', 'Ibarra', 'M', '0971000023'],
+  ['Alma', 'Jiménez', 'F', '0971000024'], ['Felipe', 'Leiva', 'M', '0971000025'],
+  ['Isabella', 'Medina', 'F', '0971000026'], ['Bruno', 'Núñez', 'M', '0971000027'],
+  ['Josefina', 'Acosta', 'F', '0971000028'], ['Tomás', 'Benítez', 'M', '0971000029'],
+  ['Amparo', 'Caballero', 'F', '0971000030'],
+  ['Mora', 'Castro', 'F', '0971000031'], ['Santiago', 'Domínguez', 'M', '0971000032'],
+  ['Emilia', 'Estigarribia', 'F', '0971000033'], ['Facundo', 'Flores', 'M', '0971000034'],
+  ['Pilar', 'González', 'F', '0971000035'], ['Benicio', 'Insfrán', 'M', '0971000036'],
+  ['Clara', 'Lezcano', 'F', '0971000037'], ['Julián', 'Maidana', 'M', '0971000038'],
+  ['Lola', 'Morínigo', 'F', '0971000039'], ['Dante', 'Ocampos', 'M', '0971000040'],
+  ['Renata', 'Páez', 'F', '0971000041'], ['Valentino', 'Quiñónez', 'M', '0971000042'],
+  ['Aitana', 'Recalde', 'F', '0971000043'], ['Máximo', 'Sosa', 'M', '0971000044'],
+  ['Maia', 'Torres', 'F', '0971000045'],
+  ['Agustina', 'Vázquez', 'F', '0971000046'], ['Lorenzo', 'Zárate', 'M', '0971000047'],
+  ['Bianca', 'Arce', 'F', '0971000048'], ['Pedro', 'Brítez', 'M', '0971000049'],
+  ['Delfina', 'Cáceres', 'F', '0971000050'], ['Simón', 'Delgado', 'M', '0971000051'],
+  ['Malena', 'Espínola', 'F', '0971000052'], ['Ramiro', 'Franco', 'M', '0971000053'],
+  ['Luz', 'Giménez', 'F', '0971000054'], ['Joaquín', 'López', 'M', '0971000055'],
+  ['Victoria', 'Méndez', 'F', '0971000056'], ['Alejo', 'Noguera', 'M', '0971000057'],
+  ['Guadalupe', 'Ríos', 'F', '0971000058'], ['Ignacio', 'Servín', 'M', '0971000059'],
+  ['Carolina', 'Vera', 'F', '0971000060'],
 ];
 const catalog = [
   ['Consulta odontológica', 'Consulta', 'Evaluación clínica inicial', 80000, 30],
@@ -179,7 +203,7 @@ async function main() {
     }
 
     await connection.commit();
-    console.log('Datos ficticios cargados: 15 pacientes, 4 odontólogos, una recepción, citas pasadas y futuras, fichas, odontogramas, tratamientos y pagos.');
+    console.log('Datos ficticios cargados: 60 pacientes (15 por odontólogo), 4 odontólogos, una recepción, citas pasadas y futuras, fichas, odontogramas, tratamientos y pagos.');
     console.log(`Contraseña común de las cuentas demo: ${demoPassword}`);
     console.log('Cuentas odontólogo: ana.benitez@dentalis.test, mateo.gomez@dentalis.test, lucia.rojas@dentalis.test, nicolas.vera@dentalis.test');
     console.log('Cuenta recepción: recepcion.demo@dentalis.test');

@@ -1,6 +1,28 @@
 const pool = require('../config/db');
 
 const AppointmentModel = {
+  async findAppointmentRequests() {
+    const [rows] = await pool.execute(
+      `SELECT t.*, CONCAT(p.nombre, ' ', p.apellido) AS paciente_nombre,
+              p.telefono AS paciente_telefono,
+              CONCAT(u.nombre, ' ', u.apellido) AS odontologo_nombre,
+              CONCAT(c.nombre, ' ', c.apellido) AS solicitante_nombre
+       FROM turnos t
+       JOIN pacientes p ON p.id = t.paciente_id
+       JOIN usuarios u ON u.id = t.odontologo_id
+       JOIN usuarios c ON c.id = t.creado_por
+       WHERE t.estado = 'pendiente' AND c.rol IN ('odontologo', 'usuario')
+       ORDER BY t.fecha ASC, t.hora ASC`
+    );
+    return rows;
+  },
+  async isAppointmentRequest(id) {
+    const [rows] = await pool.execute(
+      `SELECT t.id FROM turnos t JOIN usuarios c ON c.id = t.creado_por
+       WHERE t.id = ? AND t.estado = 'pendiente' AND c.rol IN ('odontologo', 'usuario') LIMIT 1`, [id]
+    );
+    return Boolean(rows[0]);
+  },
   async findAll({ fecha, odontologoId, estado, pacienteId } = {}) {
     let where = 'WHERE 1=1';
     const params = [];
@@ -43,7 +65,7 @@ const AppointmentModel = {
 
   async findByDateAndOdontologo(fecha, odontologoId, excludeId = null) {
     let sql = `SELECT id, hora, duracion_min FROM turnos
-               WHERE fecha = ? AND odontologo_id = ? AND estado NOT IN ('cancelado')`;
+               WHERE fecha = ? AND odontologo_id = ? AND estado <> 'cancelado'`;
     const params = [fecha, odontologoId];
     if (excludeId) { sql += ' AND id != ?'; params.push(excludeId); }
     const [rows] = await pool.execute(sql, params);

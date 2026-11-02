@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import paymentService from '../../services/paymentService';
-import Card from '../../components/Card';
 import Colors from '../../constants/colors';
 
 export default function PaymentsScreen({ navigation }) {
@@ -19,9 +19,9 @@ export default function PaymentsScreen({ navigation }) {
     try {
       const data = await paymentService.getSummaryByOdontologo();
       setOdontologos(data);
-      if (data.length > 0 && !selected) {
-        setSelected(data[0].odontologo_id);
-      }
+      if (data.length > 0) {
+  setSelected((current) => current ?? data[0].odontologo_id);
+}
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'No se pudo cargar');
     } finally {
@@ -30,11 +30,16 @@ export default function PaymentsScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { fetchSummary(); }, [fetchSummary]);
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    void fetchSummary();
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [fetchSummary]);
 
   useEffect(() => {
     if (!selected) return;
-    setLoadingPac(true);
     paymentService.getByOdontologoPacientes(selected)
       .then(setPacientes)
       .catch(() => {})
@@ -53,7 +58,7 @@ export default function PaymentsScreen({ navigation }) {
     <View style={styles.container}>
       {/* Selector de odontólogos */}
       <View style={styles.odontologoStrip}>
-        <FlatList
+        <TrackedFlatList
           horizontal
           data={odontologos}
           keyExtractor={(o) => String(o.odontologo_id)}
@@ -62,8 +67,10 @@ export default function PaymentsScreen({ navigation }) {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.odoBtn, selected === item.odontologo_id && styles.odoBtnActive]}
-              onPress={() => setSelected(item.odontologo_id)}
-            >
+onPress={() => {
+  setLoadingPac(true);
+  setSelected(item.odontologo_id);
+}}            >
               <View style={styles.odoAvatar}>
                 <Text style={styles.odoAvatarText}>{item.odontologo_nombre[0]}</Text>
               </View>
@@ -103,7 +110,7 @@ export default function PaymentsScreen({ navigation }) {
       {loadingPac ? (
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
       ) : (
-        <FlatList
+        <TrackedFlatList
           data={pacientes}
           keyExtractor={(p) => String(p.paciente_id)}
           contentContainerStyle={styles.list}

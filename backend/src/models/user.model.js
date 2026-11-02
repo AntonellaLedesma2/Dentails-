@@ -49,6 +49,16 @@ const UserModel = {
     return rows;
   },
 
+  async findActiveDentists() {
+    const [rows] = await pool.execute(
+      `SELECT id, nombre, apellido
+       FROM usuarios
+       WHERE rol = 'odontologo' AND estado = 'activo'
+       ORDER BY apellido ASC, nombre ASC`
+    );
+    return rows;
+  },
+
   /**
    * Crea un nuevo usuario
    */
@@ -61,16 +71,58 @@ const UserModel = {
     return result.insertId;
   },
 
+  async createPatientAccount({ nombre, apellido, correo, telefono, passwordHash }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [userResult] = await connection.execute(
+        `INSERT INTO usuarios (nombre, apellido, correo, password_hash, rol)
+         VALUES (?, ?, ?, ?, 'usuario')`,
+        [nombre, apellido, correo, passwordHash]
+      );
+      const userId = userResult.insertId;
+      await connection.execute(
+        `INSERT INTO pacientes (nombre, apellido, correo, telefono, usuario_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [nombre, apellido, correo, telefono || null, userId]
+      );
+      await connection.commit();
+      return userId;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   /**
    * Actualiza rol y/o estado de un usuario
    */
   async updateRolEstado(id, { rol, estado }) {
-    const [result] = await pool.execute(
-      `UPDATE usuarios SET rol = COALESCE(?, rol), estado = COALESCE(?, estado)
-       WHERE id = ?`,
-      [rol || null, estado || null, id]
-    );
-    return result.affectedRows > 0;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [users] = await connection.execute(`SELECT id FROM usuarios WHERE id = ? FOR UPDATE`, [id]);
+      if (!users.length) {
+        await connection.rollback();
+        return false;
+      }
+      await connection.execute(
+        `UPDATE usuarios SET rol = COALESCE(?, rol), estado = COALESCE(?, estado) WHERE id = ?`,
+        [rol || null, estado || null, id]
+      );
+      if (estado) {
+        await connection.execute(`UPDATE pacientes SET estado = ? WHERE usuario_id = ?`, [estado, id]);
+      }
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   /**

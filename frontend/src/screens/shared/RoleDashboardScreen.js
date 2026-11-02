@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions,
+  ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_LABELS, ROLES } from '../../constants/roles';
@@ -8,6 +9,7 @@ import Colors from '../../constants/colors';
 import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import userService from '../../services/userService';
+import { useAppUi } from '../../context/AppUiContext';
 
 const CONFIG = {
   [ROLES.ADMINISTRADOR]: {
@@ -15,6 +17,7 @@ const CONFIG = {
     subtitle: 'Organizá la clínica y controlá la operación general.',
     actions: [
       { label: 'Reservaciones', detail: 'Agenda de la clínica', icon: '▣', route: 'Agenda', tone: 'green' },
+      { label: 'Solicitudes de turnos', detail: 'Confirmar o rechazar citas', icon: '◷', route: 'AppointmentRequests', tone: 'amber' },
       { label: 'Odontólogos', detail: 'Equipo y carga de atención', icon: '♙', route: 'Dentists', tone: 'violet' },
       { label: 'Cuentas y ventas', detail: 'Actividad financiera', icon: '$', route: 'Sales', tone: 'amber' },
       { label: 'Gestionar usuarios', detail: 'Cuentas y roles', icon: '♙', route: 'UsersList', tone: 'blue' },
@@ -31,6 +34,7 @@ const CONFIG = {
       { label: 'Nuevo turno', detail: 'Agendar una visita', icon: '+', route: 'NewAppointment', tone: 'blue' },
       { label: 'Nuevo paciente', detail: 'Cargar datos administrativos', icon: '◉', route: 'NewPatient', tone: 'green' },
       { label: 'Agenda', detail: 'Confirmar o reprogramar', icon: '▣', route: 'Agenda', tone: 'violet' },
+      { label: 'Solicitudes de turnos', detail: 'Revisar citas del odontólogo', icon: '◷', route: 'AppointmentRequests', tone: 'amber' },
       { label: 'Pagos y cuentas', detail: 'Gestión de cobros', icon: '$', route: 'Payments', tone: 'amber' },
     ],
   },
@@ -39,6 +43,7 @@ const CONFIG = {
     subtitle: 'Tu agenda y la atención de tus pacientes.',
     actions: [
       { label: 'Mi agenda', detail: 'Solo tus turnos', icon: '▣', route: 'Agenda', tone: 'blue' },
+      { label: 'Solicitar turno', detail: 'Proponer una cita a recepción', icon: '+', route: 'AppointmentForm', tone: 'amber' },
       { label: 'Mis pacientes', detail: 'Pacientes asignados', icon: '◉', route: 'Patients', tone: 'green' },
       { label: 'Fichas clínicas', detail: 'Consultas y evolución', icon: '▤', route: 'ClinicalRecords', tone: 'violet' },
       { label: 'Tratamientos', detail: 'Planes de atención', icon: '◇', route: 'Treatments', tone: 'amber' },
@@ -75,22 +80,25 @@ function getTone(tone) {
 }
 
 function MetricCard({ label, value, icon, tone }) {
+  const { colors } = useAppUi();
   const palette = getTone(tone);
   return (
-    <View style={styles.metricCard}>
+    <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.metricIcon, { backgroundColor: palette.bg }]}>
         <Text style={[styles.metricGlyph, { color: palette.color }]}>{icon}</Text>
       </View>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: colors.muted }]}>{label}</Text>
+      <Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }
 
 export default function RoleDashboardScreen({ role, navigation }) {
+  const { colors } = useAppUi();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1080;
+  const isCompact = width < 520;
   const config = CONFIG[role] || CONFIG[ROLES.USUARIO];
   const [appointments, setAppointments] = useState([]);
   const [activeUsers, setActiveUsers] = useState('—');
@@ -144,18 +152,18 @@ export default function RoleDashboardScreen({ role, navigation }) {
         : [];
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={[styles.welcome, isDesktop && styles.welcomeDesktop]}>
+    <TrackedScrollView style={[styles.scroll, { backgroundColor: colors.background }]} contentContainerStyle={[styles.content, isCompact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
+      <View style={[styles.welcome, isDesktop && styles.welcomeDesktop, isCompact && styles.welcomeCompact]}>
         <View style={styles.welcomeText}>
-          <Text style={styles.eyebrow}>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</Text>
-          <Text style={styles.heading}>{config.greeting}, {user?.nombre || 'bienvenido'}.</Text>
-          <Text style={styles.subtitle}>{config.subtitle}</Text>
+          <Text style={[styles.eyebrow, { color: colors.muted }]}>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</Text>
+          <Text style={[styles.heading, { color: colors.text }, isCompact && styles.headingCompact]}>{config.greeting}, {user?.nombre || 'bienvenido'}.</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>{config.subtitle}</Text>
         </View>
         <View style={styles.roleChip}><Text style={styles.roleChipText}>{ROLE_LABELS[role]}</Text></View>
       </View>
 
       {role === ROLES.USUARIO ? (
-        <View style={styles.personalCard}>
+          <View style={[styles.personalCard, { backgroundColor: colors.surface, borderColor: colors.border }, isCompact && styles.personalCardCompact]}>
           <View style={styles.personalMark}><Text style={styles.personalGlyph}>○</Text></View>
           <View style={styles.personalCopy}>
             <Text style={styles.personalTitle}>Acceso personal</Text>
@@ -173,11 +181,11 @@ export default function RoleDashboardScreen({ role, navigation }) {
 
       <View style={[styles.panels, isDesktop && styles.panelsDesktop]}>
         {role !== ROLES.USUARIO && (
-          <View style={[styles.panel, isDesktop && styles.agendaPanel]}>
+          <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }, isDesktop && styles.agendaPanel]}>
             <View style={styles.panelHeader}>
               <View>
-                <Text style={styles.panelTitle}>{role === ROLES.ODONTOLOGO ? 'Mi agenda de hoy' : 'Agenda de hoy'}</Text>
-                <Text style={styles.panelSubtitle}>{appointments.length} {appointments.length === 1 ? 'turno programado' : 'turnos programados'}</Text>
+                <Text style={[styles.panelTitle, { color: colors.text }]}>{role === ROLES.ODONTOLOGO ? 'Mi agenda de hoy' : 'Agenda de hoy'}</Text>
+                <Text style={[styles.panelSubtitle, { color: colors.muted }]}>{appointments.length} {appointments.length === 1 ? 'turno programado' : 'turnos programados'}</Text>
               </View>
               <TouchableOpacity onPress={() => navigation.navigate('Agenda')} style={styles.textAction}>
                 <Text style={styles.textActionLabel}>Ver agenda  ›</Text>
@@ -197,13 +205,13 @@ export default function RoleDashboardScreen({ role, navigation }) {
                 >
                   <View style={styles.timePill}><Text style={styles.timeText}>{formatTime(item.hora)}</Text></View>
                   <View style={styles.appointmentCopy}>
-                    <Text style={styles.appointmentName}>{item.paciente_nombre}</Text>
-                    <Text style={styles.appointmentMeta}>
+                    <Text style={[styles.appointmentName, { color: colors.text }]}>{item.paciente_nombre}</Text>
+                    <Text style={[styles.appointmentMeta, { color: colors.muted }]}>
                       {role === ROLES.ODONTOLOGO ? (item.motivo || 'Atención clínica') : `${item.odontologo_nombre || 'Odontólogo'}${item.motivo ? ` · ${item.motivo}` : ''}`}
                     </Text>
                   </View>
                   <View style={[styles.statusDot, { backgroundColor: item.estado === 'confirmado' ? '#29A979' : item.estado === 'cancelado' ? '#D97777' : '#E7A83C' }]} />
-                  <Text style={styles.rowStatus}>{item.estado}</Text>
+                  <Text style={[styles.rowStatus, { color: colors.muted }]}>{item.estado}</Text>
                 </TouchableOpacity>
               ))
             ) : (
@@ -221,11 +229,11 @@ export default function RoleDashboardScreen({ role, navigation }) {
           </View>
         )}
 
-        <View style={[styles.panel, isDesktop && styles.actionsPanel]}>
+        <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }, isDesktop && styles.actionsPanel]}>
           <View style={styles.panelHeader}>
             <View>
-              <Text style={styles.panelTitle}>{role === ROLES.USUARIO ? 'Accesos de tu cuenta' : 'Accesos rápidos'}</Text>
-              <Text style={styles.panelSubtitle}>Herramientas de {ROLE_LABELS[role].toLowerCase()}</Text>
+              <Text style={[styles.panelTitle, { color: colors.text }]}>{role === ROLES.USUARIO ? 'Accesos de tu cuenta' : 'Accesos rápidos'}</Text>
+              <Text style={[styles.panelSubtitle, { color: colors.muted }]}>Herramientas de {ROLE_LABELS[role].toLowerCase()}</Text>
             </View>
           </View>
           <View style={styles.actionList}>
@@ -235,8 +243,8 @@ export default function RoleDashboardScreen({ role, navigation }) {
                 <TouchableOpacity key={action.route} style={styles.actionRow} onPress={() => navigation.navigate(action.route)}>
                   <View style={[styles.actionIcon, { backgroundColor: palette.bg }]}><Text style={[styles.actionGlyph, { color: palette.color }]}>{action.icon}</Text></View>
                   <View style={styles.actionCopy}>
-                    <Text style={styles.actionTitle}>{action.label}</Text>
-                    <Text style={styles.actionDetail}>{action.detail}</Text>
+                    <Text style={[styles.actionTitle, { color: colors.text }]}>{action.label}</Text>
+                    <Text style={[styles.actionDetail, { color: colors.muted }]}>{action.detail}</Text>
                   </View>
                   <Text style={styles.actionChevron}>›</Text>
                 </TouchableOpacity>
@@ -245,18 +253,21 @@ export default function RoleDashboardScreen({ role, navigation }) {
           </View>
         </View>
       </View>
-    </ScrollView>
+    </TrackedScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#F4F7FB' },
   content: { padding: 26, paddingBottom: 40, maxWidth: 1500, width: '100%', alignSelf: 'center' },
+  contentCompact: { padding: 16, paddingBottom: 28 },
   welcome: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 22 },
+  welcomeCompact: { flexDirection: 'column', alignItems: 'flex-start', gap: 10, marginBottom: 18 },
   welcomeDesktop: { marginBottom: 25 },
   welcomeText: { flex: 1 },
   eyebrow: { color: '#8A98AE', fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
   heading: { color: '#233452', fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginTop: 7 },
+  headingCompact: { fontSize: 22, lineHeight: 28 },
   subtitle: { color: '#77869E', fontSize: 12, marginTop: 6, lineHeight: 18 },
   roleChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EAF1FF' },
   roleChipText: { color: '#2D60D6', fontSize: 10, fontWeight: '700' },
@@ -267,6 +278,7 @@ const styles = StyleSheet.create({
   metricLabel: { color: '#8290A7', fontSize: 10, fontWeight: '600' },
   metricValue: { color: '#273754', fontSize: 25, fontWeight: '800', marginTop: 4 },
   personalCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderRadius: 13, borderWidth: 1, borderColor: '#E8EDF4', backgroundColor: '#FFFFFF', marginBottom: 20 },
+  personalCardCompact: { flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 16 },
   personalMark: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#EAF1FF', alignItems: 'center', justifyContent: 'center' },
   personalGlyph: { color: '#2D60D6', fontSize: 25 },
   personalCopy: { flex: 1 },

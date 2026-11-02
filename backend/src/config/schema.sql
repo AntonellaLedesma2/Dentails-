@@ -53,12 +53,14 @@ CREATE TABLE IF NOT EXISTS pacientes (
   direccion       VARCHAR(255),
   obra_social     VARCHAR(100),
   nro_afiliado    VARCHAR(50),
+  usuario_id      INT UNIQUE,
   observaciones   TEXT,
   estado          ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
   creado_por      INT,
   creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
+  FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------

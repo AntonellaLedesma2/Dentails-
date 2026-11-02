@@ -2,6 +2,11 @@ import api from './api';
 import secureStorage from './secureStorage';
 
 const authService = {
+  async registerPatient(data) {
+    const res = await api.post('/auth/register', data);
+    return res.data;
+  },
+
   /**
    * Login con email/usuario y contraseña
    */
@@ -21,8 +26,8 @@ const authService = {
   /**
    * Login con OAuth (Google, Facebook, GitHub)
    */
-  async oauthLogin(provider, code, redirectUri, codeVerifier, clientId) {
-    const res = await api.post('/auth/oauth', { provider, code, redirectUri, codeVerifier, clientId });
+  async oauthLogin(provider, credentials) {
+    const res = await api.post('/auth/oauth', { provider, ...credentials });
     return res.data;
   },
 

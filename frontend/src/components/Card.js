@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Colors from '../constants/colors';
+import { useAppUi } from '../context/AppUiContext';
 
 /**
  * Card genérica con título opcional, acción opcional y contenido.
  */
 export default function Card({ title, action, onAction, children, style }) {
+  const { colors } = useAppUi();
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>
       {(title || action) && (
         <View style={styles.header}>
-          {title && <Text style={styles.title}>{title}</Text>}
+          {title && <Text style={[styles.title, { color: colors.text }]}>{title}</Text>}
           {action && (
             <TouchableOpacity onPress={onAction}>
               <Text style={styles.action}>{action}</Text>

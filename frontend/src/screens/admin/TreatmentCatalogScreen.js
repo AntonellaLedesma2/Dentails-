@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { TrackedScrollView, TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Alert, Modal, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Button from '../../components/Button';
@@ -26,8 +27,13 @@ export default function TreatmentCatalogScreen() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    void load();
+  }, 0);
 
+  return () => clearTimeout(timer);
+}, [load]);
   function openForm(item = null) {
     setEditing(item);
     setForm(item ? {
@@ -75,7 +81,7 @@ export default function TreatmentCatalogScreen() {
           <Text style={s.addLabel}>＋ {width > 620 ? 'Nuevo tratamiento' : 'Agregar'}</Text>
         </TouchableOpacity>
       </View>
-      <FlatList
+      <TrackedFlatList
         data={items}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={s.list}
@@ -106,7 +112,7 @@ export default function TreatmentCatalogScreen() {
       />
       <Modal visible={modal} transparent animationType="fade" onRequestClose={() => setModal(false)}>
         <View style={s.modalShade}>
-          <ScrollView contentContainerStyle={s.modalScroll} keyboardShouldPersistTaps="handled">
+          <TrackedScrollView contentContainerStyle={s.modalScroll} keyboardShouldPersistTaps="handled">
             <View style={s.modalCard}>
               <Text style={s.modalTitle}>{editing ? 'Editar prestación' : 'Nueva prestación'}</Text>
               <Text style={s.modalHint}>El precio queda disponible para el odontólogo al preparar un plan de atención.</Text>
@@ -120,7 +126,7 @@ export default function TreatmentCatalogScreen() {
                 <Button title="Guardar" onPress={save} loading={saving} style={s.modalAction} />
               </View>
             </View>
-          </ScrollView>
+          </TrackedScrollView>
         </View>
       </Modal>
     </View>

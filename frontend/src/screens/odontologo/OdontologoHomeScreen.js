@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { TrackedScrollView } from '../../components/TrackedScroll';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import Card, { StatCard } from '../../components/Card';
 import Colors from '../../constants/colors';
@@ -28,7 +29,7 @@ export default function OdontologoHomeScreen({ navigation }) {
   }, []);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <TrackedScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
       <View style={styles.greetingSection}>
         <Text style={styles.greeting}>{greeting}, Dr/a. {user?.nombre}.</Text>
@@ -83,7 +84,7 @@ export default function OdontologoHomeScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </View>
-    </ScrollView>
+    </TrackedScrollView>
   );
 }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet, View } from 'react-native';
 import Colors from '../constants/colors';
+import { useAppUi } from '../context/AppUiContext';
 
 export default function Button({
   title,
@@ -13,13 +14,28 @@ export default function Button({
   style,
   textStyle,
 }) {
+  const { colors, mode } = useAppUi();
+  const isDark = mode === 'dark';
   const isDisabled = disabled || loading;
+  const themeVariant = {
+    primary: { backgroundColor: isDark ? '#315FC2' : Colors.primary, shadowColor: isDark ? '#315FC2' : Colors.primary },
+    secondary: { backgroundColor: isDark ? '#2B3A52' : Colors.navy },
+    outline: { backgroundColor: 'transparent', borderColor: colors.primary },
+    ghost: { backgroundColor: colors.soft },
+  }[variant];
+  const themeText = {
+    primary: Colors.white,
+    secondary: colors.text,
+    outline: colors.primary,
+    ghost: colors.primary,
+  }[variant];
 
   return (
     <TouchableOpacity
       style={[
         styles.base,
         styles[variant],
+        themeVariant,
         styles[`size_${size}`],
         isDisabled && styles.disabled,
         style,
@@ -32,13 +48,13 @@ export default function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
+          color={variant === 'outline' || variant === 'ghost' ? colors.primary : Colors.white}
           size="small"
         />
       ) : (
         <View style={styles.row}>
           {icon && <Text style={styles.icon}>{icon}</Text>}
-          <Text style={[styles.text, styles[`${variant}Text`], styles[`size_${size}Text`], textStyle]}>
+          <Text style={[styles.text, styles[`${variant}Text`], themeText && { color: themeText }, styles[`size_${size}Text`], textStyle]}>
             {title}
           </Text>
         </View>

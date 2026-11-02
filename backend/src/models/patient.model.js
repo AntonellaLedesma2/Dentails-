@@ -3,17 +3,21 @@ const pool = require('../config/db');
 const PatientModel = {
   async findAll({ search = '', estado = 'activo', odontologoId = null } = {}) {
     const like = `%${search}%`;
+    const stateFilter = estado && estado !== 'todos' ? 'estado = ? AND' : '';
     const doctorScope = odontologoId
       ? 'AND EXISTS (SELECT 1 FROM turnos t WHERE t.paciente_id = pacientes.id AND t.odontologo_id = ?)'
       : '';
-    const params = [estado, like, like, like, like];
+    const params = [...(stateFilter ? [estado] : []), ...Array(11).fill(like)];
     if (odontologoId) params.push(odontologoId);
     const [rows] = await pool.execute(
       `SELECT id, nombre, apellido, dni, fecha_nacimiento, telefono, correo,
               obra_social, estado, creado_en
        FROM pacientes
-       WHERE estado = ?
-         AND (nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR correo LIKE ?)
+       WHERE ${stateFilter}
+         (nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR correo LIKE ?
+              OR telefono LIKE ? OR direccion LIKE ? OR obra_social LIKE ?
+              OR nro_afiliado LIKE ? OR sexo LIKE ?
+              OR CAST(fecha_nacimiento AS CHAR) LIKE ? OR CAST(observaciones AS CHAR) LIKE ?)
          ${doctorScope}
        ORDER BY apellido ASC, nombre ASC`,
       params
@@ -30,6 +34,13 @@ const PatientModel = {
     const [rows] = await pool.execute(
       `SELECT * FROM pacientes WHERE id = ? ${doctorScope} LIMIT 1`,
       params
+    );
+    return rows[0] || null;
+  },
+
+  async findByUserId(userId) {
+    const [rows] = await pool.execute(
+      `SELECT * FROM pacientes WHERE usuario_id = ? AND estado = 'activo' LIMIT 1`, [userId]
     );
     return rows[0] || null;
   },
@@ -77,11 +88,28 @@ const PatientModel = {
   },
 
   async setEstado(id, estado) {
-    const [result] = await pool.execute(
-      `UPDATE pacientes SET estado = ? WHERE id = ?`,
-      [estado, id]
-    );
-    return result.affectedRows > 0;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [patients] = await connection.execute(
+        `SELECT usuario_id FROM pacientes WHERE id = ? FOR UPDATE`, [id]
+      );
+      if (!patients.length) {
+        await connection.rollback();
+        return false;
+      }
+      await connection.execute(`UPDATE pacientes SET estado = ? WHERE id = ?`, [estado, id]);
+      if (patients[0].usuario_id) {
+        await connection.execute(`UPDATE usuarios SET estado = ? WHERE id = ?`, [estado, patients[0].usuario_id]);
+      }
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 };
 

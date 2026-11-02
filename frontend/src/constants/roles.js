@@ -9,5 +9,5 @@ export const ROLE_LABELS = {
   administrador: 'Administrador',
   recepcion: 'Recepción',
   odontologo: 'Odontólogo',
-  usuario: 'Usuario',
+  usuario: 'Paciente',
 };

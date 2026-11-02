@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import patientService from '../../services/patientService';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
-import Colors from '../../constants/colors';
+import patientService    from '../../services/patientService';
+import Button            from '../../components/Button';
+import Input             from '../../components/Input';
+import ObraSocialPicker  from '../../components/ObraSocialPicker';
+import Colors            from '../../constants/colors';
 
 const SEXO_OPTIONS = [
   { value: 'masculino', label: 'Masculino' },
@@ -20,13 +21,14 @@ const EMPTY_FORM = {
 };
 
 export default function PatientFormScreen({ route, navigation }) {
-  const { mode, patientId } = route.params; // mode: 'create' | 'edit'
+  const { mode = 'create', patientId } = route?.params || {}; // mode: 'create' | 'edit'
   const isEdit = mode === 'edit';
 
   const [form, setForm]     = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(isEdit);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (!isEdit) return;
@@ -46,14 +48,14 @@ export default function PatientFormScreen({ route, navigation }) {
       });
       setFetching(false);
     }).catch(() => {
-      Alert.alert('Error', 'No se pudo cargar el paciente');
+      setFormError('No se pudo cargar el paciente. Volvé a la lista e intentá nuevamente.');
       navigation.goBack();
     });
-  }, [isEdit, patientId]);
-
+}, [isEdit, patientId, navigation]);
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
     setErrors((e) => ({ ...e, [field]: undefined }));
+    setFormError('');
   }
 
   function validate() {
@@ -71,16 +73,15 @@ export default function PatientFormScreen({ route, navigation }) {
     try {
       if (isEdit) {
         await patientService.update(patientId, form);
-        Alert.alert('Éxito', 'Paciente actualizado', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        navigation.goBack();
       } else {
         const res = await patientService.create(form);
-        Alert.alert('Éxito', 'Paciente registrado', [
-          { text: 'Ver ficha', onPress: () => navigation.replace('PatientDetail', { patientId: res.patientId }) },
-          { text: 'Volver', onPress: () => navigation.goBack() },
-        ]);
+        navigation.replace('PatientDetail', { patientId: res.patientId });
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || 'No se pudo guardar el paciente');
+      setFormError(err.response?.data?.message || (err.request
+        ? 'No se pudo conectar con el servidor. Revisá que esté iniciado e intentá otra vez.'
+        : 'No se pudo guardar el paciente. Revisá los datos e intentá otra vez.'));
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,13 @@ export default function PatientFormScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="always" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
+
+        <View style={styles.pageHeading}>
+          <Text style={styles.pageTitle}>{isEdit ? 'Editar paciente' : 'Nuevo paciente'}</Text>
+          <Text style={styles.pageSubtitle}>{isEdit ? 'Actualizá los datos de la ficha del paciente.' : 'Completá los datos para crear una ficha.'}</Text>
+        </View>
+        {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
 
         <Text style={styles.sectionLabel}>DATOS PERSONALES</Text>
         <View style={styles.section}>
@@ -133,7 +140,11 @@ export default function PatientFormScreen({ route, navigation }) {
 
         <Text style={styles.sectionLabel}>OBRA SOCIAL</Text>
         <View style={styles.section}>
-          <Input label="Obra social"   value={form.obraSocial}  onChangeText={(v) => set('obraSocial', v)} />
+          <ObraSocialPicker
+            label="Obra social"
+            value={form.obraSocial}
+            onChange={(v) => set('obraSocial', v)}
+          />
           <Input label="Nro. afiliado" value={form.nroAfiliado} onChangeText={(v) => set('nroAfiliado', v)} />
         </View>
 
@@ -164,7 +175,11 @@ export default function PatientFormScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex:      { flex: 1, backgroundColor: Colors.background },
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  container: { padding: 16, paddingBottom: 40 },
+  container: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: 20, paddingBottom: 40, flexGrow: 1 },
+  pageHeading: { marginBottom: 2, marginTop: 2 },
+  pageTitle: { color: Colors.text.primary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
+  pageSubtitle: { color: Colors.text.secondary, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  formError: { color: '#B42332', backgroundColor: '#FDEBEC', borderRadius: 12, padding: 12, fontSize: 13, lineHeight: 19 },
 
   sectionLabel: {
     fontSize: 11, fontWeight: '700', color: Colors.text.label,

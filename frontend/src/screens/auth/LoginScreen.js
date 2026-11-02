@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView, Alert, TouchableOpacity, useColorScheme,
+  Platform, Alert, TouchableOpacity,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
+import { useAppUi } from '../../context/AppUiContext';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 
 const THEMES = {
   light: {
@@ -40,13 +42,13 @@ const THEMES = {
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
-  const systemScheme = useColorScheme();
-  const [isDark, setIsDark] = useState(systemScheme === 'dark');
+  const { mode, toggleTheme } = useAppUi();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const theme = isDark ? THEMES.dark : THEMES.light;
+  const isDark = mode === 'dark';
+  const theme = THEMES[mode];
 
   function validate() {
     const nextErrors = {};
@@ -54,6 +56,30 @@ export default function LoginScreen({ navigation }) {
     if (!password) nextErrors.password = 'Ingresá tu contraseña';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleIdentifierChange(value) {
+    setIdentifier(value);
+    if (value.trim()) {
+      setErrors((current) => {
+        if (!current.identifier) return current;
+        const next = { ...current };
+        delete next.identifier;
+        return next;
+      });
+    }
+  }
+
+  function handlePasswordChange(value) {
+    setPassword(value);
+    if (value) {
+      setErrors((current) => {
+        if (!current.password) return current;
+        const next = { ...current };
+        delete next.password;
+        return next;
+      });
+    }
   }
 
   async function handleLogin() {
@@ -77,7 +103,7 @@ export default function LoginScreen({ navigation }) {
       style={[styles.flex, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
+      <TrackedScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="always"
         keyboardDismissMode="none"
@@ -94,7 +120,7 @@ export default function LoginScreen({ navigation }) {
             </View>
           </View>
           <TouchableOpacity
-            onPress={() => setIsDark((value) => !value)}
+            onPress={toggleTheme}
             style={[styles.themeToggle, { backgroundColor: theme.soft, borderColor: theme.border }]}
             accessibilityRole="button"
             accessibilityLabel={`Cambiar a modo ${isDark ? 'claro' : 'oscuro'}`}
@@ -112,8 +138,9 @@ export default function LoginScreen({ navigation }) {
               label="Correo o usuario"
               placeholder="nombre@clinica.com"
               value={identifier}
-              onChangeText={setIdentifier}
+              onChangeText={handleIdentifierChange}
               error={errors.identifier}
+              showFocusStyle={false}
               leftIcon="✉"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -124,8 +151,9 @@ export default function LoginScreen({ navigation }) {
               label="Contraseña"
               placeholder="Ingresá tu contraseña"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={handlePasswordChange}
               error={errors.password}
+              showFocusStyle={false}
               leftIcon="⌑"
               secureTextEntry
               autoComplete="password"
@@ -174,8 +202,11 @@ export default function LoginScreen({ navigation }) {
           </View>
         </View>
 
+        <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.registerLink} accessibilityRole="button">
+          <Text style={[styles.registerText, { color: theme.primary }]}>Crear cuenta de paciente</Text>
+        </TouchableOpacity>
         <Text style={[styles.footer, { color: theme.muted }]}>¿Problemas para acceder? Contactá al administrador.</Text>
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -206,4 +237,6 @@ const styles = StyleSheet.create({
   oauthIcon: { fontSize: 16, fontWeight: '800' },
   oauthLabel: { fontSize: 12, fontWeight: '600' },
   footer: { fontSize: 12, textAlign: 'center', marginTop: 22, lineHeight: 18 },
+  registerLink: { alignSelf: 'center', paddingVertical: 14 },
+  registerText: { fontSize: 14, fontWeight: '700' },
 });

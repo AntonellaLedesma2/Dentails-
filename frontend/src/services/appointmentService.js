@@ -6,6 +6,11 @@ const appointmentService = {
     return res.data.appointments;
   },
 
+  async getRequests() {
+    const res = await api.get('/appointments/requests');
+    return res.data.appointments;
+  },
+
   async getById(id) {
     const res = await api.get(`/appointments/${id}`);
     return res.data.appointment;

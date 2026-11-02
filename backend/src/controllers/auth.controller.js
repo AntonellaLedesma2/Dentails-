@@ -1,8 +1,11 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const UserModel = require('../models/user.model');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { generateTwoFACode, sendTwoFACode } = require('../utils/email');
 const { logActivity } = require('../utils/activityLogger');
+const googleOAuthClient = new OAuth2Client();
 
 // ─── Login con email/password ────────────────────────────────────────────────
 
@@ -71,6 +74,41 @@ async function login(req, res, next) {
       },
     });
   } catch (err) {
+    next(err);
+  }
+}
+
+async function registerPatient(req, res, next) {
+  try {
+    const nombre = req.body.nombre.trim();
+    const apellido = req.body.apellido.trim();
+    const correo = req.body.correo.trim().toLowerCase();
+    const telefono = req.body.telefono?.trim() || null;
+    const existing = await UserModel.findByEmailOrUsername(correo);
+    if (existing) return res.status(409).json({ error: true, message: 'Ese correo ya tiene una cuenta. Iniciá sesión.' });
+
+    const passwordHash = await bcrypt.hash(req.body.password, 10);
+    const userId = await UserModel.createPatientAccount({ nombre, apellido, correo, telefono, passwordHash });
+    const user = { id: userId, nombre, apellido, correo, rol: 'usuario' };
+    const payload = { id: userId, rol: 'usuario' };
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+    await UserModel.saveRefreshToken(userId, refreshToken);
+    await logActivity({ usuarioId: userId, accion: 'REGISTRO_PACIENTE', ip: req.ip });
+
+    return res.status(201).json({ accessToken, refreshToken, user });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: true, message: 'Ese correo ya tiene una cuenta. Iniciá sesión.' });
+    }
+    // A patient account and its patient record are inserted together. Older
+    // installations need migration 004 to add pacientes.usuario_id.
+    if (err.code === 'ER_BAD_FIELD_ERROR' && /usuario_id/i.test(err.message || '')) {
+      return res.status(503).json({
+        error: true,
+        message: 'La base de datos todavía no está preparada para registrar pacientes. Ejecutá backend/src/config/migrations/004_public_patient_accounts.sql en la base dentalis y volvé a intentar.',
+      });
+    }
     next(err);
   }
 }
@@ -187,7 +225,9 @@ async function logout(req, res, next) {
 function allowedOAuthRedirectUris() {
   const configured = (process.env.OAUTH_REDIRECT_URIS || '').split(',').map((uri) => uri.trim()).filter(Boolean);
   if (process.env.OAUTH_REDIRECT_URI) configured.push(process.env.OAUTH_REDIRECT_URI.trim());
-  if (process.env.NODE_ENV !== 'production') configured.push('http://localhost:8081');
+  if (process.env.NODE_ENV !== 'production') {
+    configured.push('http://localhost:8081', 'http://localhost:8081/');
+  }
   configured.push('com.dentalis.app://oauth');
   return [...new Set(configured)];
 }
@@ -196,29 +236,45 @@ function oauthClientConfigurations(provider) {
   if (provider === 'google') {
     return [
       {
-        clientId: process.env.GOOGLE_WEB_CLIENT_ID,
+        clientId: process.env.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_WEB_CLIENT_SECRET,
+        requiresSecret: true,
         tokenUrl: 'https://oauth2.googleapis.com/token',
       },
       {
-        clientId: process.env.GOOGLE_ANDROID_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '721085208228-nej5f804cd8frbdsl43tg8ej4lql3q7g.apps.googleusercontent.com',
-        clientSecret: process.env.GOOGLE_ANDROID_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+        clientId: process.env.GOOGLE_ANDROID_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_ANDROID_CLIENT_SECRET,
+        requiresSecret: false,
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+      },
+      {
+        clientId: process.env.GOOGLE_IOS_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_IOS_CLIENT_SECRET,
+        requiresSecret: false,
         tokenUrl: 'https://oauth2.googleapis.com/token',
       },
     ].filter((config) => config.clientId);
   }
 
   const config = provider === 'github'
-    ? {
-        clientId: process.env.GITHUB_WEB_CLIENT_ID || process.env.GITHUB_CLIENT_ID || 'Ov23ct5VVwItyH442s5I',
-        clientSecret: process.env.GITHUB_WEB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET,
-        tokenUrl: 'https://github.com/login/oauth/access_token',
-      }
+    ? [
+        {
+          clientId: process.env.GITHUB_WEB_CLIENT_ID || process.env.GITHUB_CLIENT_ID,
+          clientSecret: process.env.GITHUB_WEB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET,
+        },
+        {
+          clientId: process.env.GITHUB_NATIVE_CLIENT_ID,
+          clientSecret: process.env.GITHUB_NATIVE_CLIENT_SECRET,
+        },
+      ].filter((candidate) => candidate.clientId)
     : {
         clientId: process.env.FACEBOOK_APP_ID,
         clientSecret: process.env.FACEBOOK_APP_SECRET,
         tokenUrl: 'https://graph.facebook.com/v26.0/oauth/access_token',
       };
+  if (Array.isArray(config)) {
+    return config.map((candidate) => ({ ...candidate, tokenUrl: 'https://github.com/login/oauth/access_token' }));
+  }
   return config.clientId ? [config] : [];
 }
 
@@ -230,7 +286,7 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
   }
 
   const config = oauthClientConfigurations(provider).find((candidate) => candidate.clientId === clientId);
-  if (!config || !config.clientSecret) {
+  if (!config || (config.requiresSecret !== false && !config.clientSecret)) {
     const error = new Error(`El cliente OAuth de ${provider} no está configurado correctamente en el servidor.`);
     error.status = 503;
     throw error;
@@ -238,11 +294,12 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
 
   const params = new URLSearchParams({
     client_id: config.clientId,
-    client_secret: config.clientSecret,
     code,
     redirect_uri: redirectUri,
   });
-  if (provider !== 'facebook') params.set('code_verifier', codeVerifier);
+  if (provider === 'google') params.set('grant_type', 'authorization_code');
+  if (config.clientSecret) params.set('client_secret', config.clientSecret);
+  if (codeVerifier) params.set('code_verifier', codeVerifier);
   const tokenResponse = await fetch(config.tokenUrl, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -251,6 +308,15 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
   const tokenData = await tokenResponse.json();
   const accessToken = tokenData.access_token;
   if (!tokenResponse.ok || !accessToken) {
+    // Keep provider diagnostics in the server log without exposing secrets or
+    // authorization codes to the client response.
+    console.error('[OAuth token exchange rejected]', {
+      provider,
+      status: tokenResponse.status,
+      error: tokenData.error || 'unknown_error',
+      description: tokenData.error_description || tokenData.error_message || 'No description returned',
+      redirectUri,
+    });
     const error = new Error('El proveedor rechazó el código de autenticación. Verificá las credenciales y la URI de retorno.');
     error.status = 401;
     throw error;
@@ -305,16 +371,94 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
   };
 }
 
+function normalizeOAuthProfile(profile, oauthId) {
+  const parts = (profile.name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    oauthId: String(oauthId),
+    email: profile.email,
+    nombre: parts.shift() || '',
+    apellido: parts.join(' '),
+  };
+}
+
+async function verifyGoogleIdToken(idToken, clientId) {
+  const allowedClient = oauthClientConfigurations('google').some((candidate) => candidate.clientId === clientId);
+  if (!allowedClient) {
+    const error = new Error('El cliente Google enviado no está autorizado en el servidor.');
+    error.status = 401;
+    throw error;
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({ idToken, audience: clientId });
+    payload = ticket.getPayload();
+  } catch {
+    payload = null;
+  }
+  if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+    const error = new Error('Google rechazó la identidad o el correo no está verificado.');
+    error.status = 401;
+    throw error;
+  }
+  return normalizeOAuthProfile({ ...payload, name: payload.name || `${payload.given_name || ''} ${payload.family_name || ''}` }, payload.sub);
+}
+
+async function verifyFacebookAccessToken(accessToken, clientId) {
+  const appId = process.env.FACEBOOK_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+  if (!appId || !appSecret || clientId !== appId) {
+    const error = new Error('Facebook no está configurado correctamente en el servidor.');
+    error.status = 503;
+    throw error;
+  }
+
+  const appAccessToken = `${appId}|${appSecret}`;
+  const debugUrl = new URL('https://graph.facebook.com/v26.0/debug_token');
+  debugUrl.searchParams.set('input_token', accessToken);
+  debugUrl.searchParams.set('access_token', appAccessToken);
+  const debugResponse = await fetch(debugUrl);
+  const debugResult = await debugResponse.json();
+  const token = debugResult.data;
+  if (!debugResponse.ok || !token?.is_valid || token.app_id !== appId) {
+    const error = new Error('Facebook devolvió un token inválido para esta aplicación.');
+    error.status = 401;
+    throw error;
+  }
+
+  const profileUrl = new URL('https://graph.facebook.com/v26.0/me');
+  profileUrl.searchParams.set('fields', 'id,name,email');
+  profileUrl.searchParams.set('access_token', accessToken);
+  const profileResponse = await fetch(profileUrl);
+  const profile = await profileResponse.json();
+  if (!profileResponse.ok || !profile.id || !profile.email) {
+    const error = new Error('Facebook no devolvió el correo. Revisá que el permiso email esté habilitado.');
+    error.status = 401;
+    throw error;
+  }
+  return normalizeOAuthProfile(profile, profile.id);
+}
+
 async function oauthCallback(req, res, next) {
   try {
-    const { provider, code, redirectUri, codeVerifier, clientId } = req.body;
+    const { provider, code, redirectUri, codeVerifier, clientId, idToken, accessToken: providerAccessToken } = req.body;
 
     const validProviders = ['google', 'facebook', 'github'];
     if (!validProviders.includes(provider)) {
       return res.status(400).json({ error: true, message: 'Proveedor no soportado' });
     }
 
-    const { oauthId, email } = await exchangeOAuthCode(provider, clientId, code, redirectUri, codeVerifier);
+    let profile;
+    if (provider === 'google' && idToken) {
+      profile = await verifyGoogleIdToken(idToken, clientId);
+    } else if (provider === 'facebook' && providerAccessToken) {
+      profile = await verifyFacebookAccessToken(providerAccessToken, clientId);
+    } else if (code) {
+      profile = await exchangeOAuthCode(provider, clientId, code, redirectUri, codeVerifier);
+    } else {
+      return res.status(400).json({ error: true, message: 'Falta la credencial OAuth del proveedor.' });
+    }
+    const { oauthId, email } = profile;
 
     // Buscar si ya existe un usuario con ese OAuth ID
     let user = await UserModel.findByOAuthId(provider, oauthId);
@@ -325,15 +469,41 @@ async function oauthCallback(req, res, next) {
       if (user) {
         await UserModel.linkOAuth(user.id, provider, oauthId);
       } else {
-        return res.status(404).json({
-          error: true,
-          message: 'No existe una cuenta asociada a este correo. Contactá al administrador para crear tu cuenta.',
-        });
+        const nombre = profile.nombre || email.split('@')[0] || 'Paciente';
+        const apellido = profile.apellido || 'Paciente';
+        const randomPasswordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        try {
+          const userId = await UserModel.createPatientAccount({
+            nombre, apellido, correo: email.trim().toLowerCase(),
+            passwordHash: randomPasswordHash,
+          });
+          await UserModel.linkOAuth(userId, provider, oauthId);
+          user = { id: userId, nombre, apellido, correo: email.trim().toLowerCase(), rol: 'usuario', estado: 'activo', two_fa_enabled: 0 };
+          await logActivity({ usuarioId: userId, accion: 'REGISTRO_PACIENTE_OAUTH', ip: req.ip });
+        } catch (createError) {
+          if (createError.code !== 'ER_DUP_ENTRY') throw createError;
+          user = await UserModel.findByEmailOrUsername(email);
+          if (!user) throw createError;
+          await UserModel.linkOAuth(user.id, provider, oauthId);
+        }
       }
     }
 
     if (user.estado !== 'activo') {
       return res.status(403).json({ error: true, message: 'La cuenta está desactivada' });
+    }
+
+    if (user.two_fa_enabled) {
+      const twoFACode = generateTwoFACode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await UserModel.saveTwoFACode(user.id, twoFACode, expiresAt);
+      await sendTwoFACode(user.correo, twoFACode);
+      await logActivity({ usuarioId: user.id, accion: 'LOGIN_OAUTH_2FA_INICIADO', ip: req.ip });
+      return res.status(200).json({
+        twoFARequired: true,
+        userId: user.id,
+        message: 'Código de verificación enviado al correo',
+      });
     }
 
     const payload = { id: user.id, rol: user.rol };
@@ -359,4 +529,4 @@ async function oauthCallback(req, res, next) {
   }
 }
 
-module.exports = { login, verifyTwoFA, refreshToken, logout, oauthCallback };
+module.exports = { registerPatient, login, verifyTwoFA, refreshToken, logout, oauthCallback };

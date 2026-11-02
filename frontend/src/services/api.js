@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { create as createAxios } from 'axios';
 import { Platform } from 'react-native';
 import secureStorage from './secureStorage';
 
@@ -17,7 +17,7 @@ const BASE_URL = Platform.OS === 'web'
   ? webApiUrl || (configuredApiUrl?.includes('10.0.2.2') ? configuredApiUrl.replace('10.0.2.2', 'localhost') : configuredApiUrl) || defaultApiUrl
   : nativeApiUrl || configuredApiUrl || defaultApiUrl;
 
-const api = axios.create({
+const api = createAxios({
   baseURL: BASE_URL,
   timeout: 10000,
   headers: {

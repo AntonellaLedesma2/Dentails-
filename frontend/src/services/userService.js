@@ -11,6 +11,11 @@ const userService = {
     return res.data.users;
   },
 
+  async getDentists() {
+    const res = await api.get('/users/odontologos');
+    return res.data.odontologos;
+  },
+
   async getById(id) {
     const res = await api.get(`/users/${id}`);
     return res.data.user;

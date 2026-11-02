@@ -79,25 +79,36 @@ export function AuthProvider({ children }) {
     return { twoFARequired: false };
   }
 
+  async function registerPatient(data) {
+    const result = await authService.registerPatient(data);
+    await authService.saveSession(result.accessToken, result.refreshToken, result.user);
+    dispatch({ type: 'LOGIN', user: result.user, token: result.accessToken });
+  }
+
   async function verifyTwoFA(userId, code) {
     const data = await authService.verifyTwoFA(userId, code);
     await authService.saveSession(data.accessToken, data.refreshToken, data.user);
     dispatch({ type: 'LOGIN', user: data.user, token: data.accessToken });
   }
 
-  async function oauthLogin(provider, code, redirectUri, codeVerifier, clientId) {
-    const data = await authService.oauthLogin(provider, code, redirectUri, codeVerifier, clientId);
+  async function oauthLogin(provider, credentials) {
+    const data = await authService.oauthLogin(provider, credentials);
+    if (data.twoFARequired) return { twoFARequired: true, userId: data.userId };
     await authService.saveSession(data.accessToken, data.refreshToken, data.user);
     dispatch({ type: 'LOGIN', user: data.user, token: data.accessToken });
+    return { twoFARequired: false };
   }
 
   async function logout() {
-    await authService.logout();
-    dispatch({ type: 'LOGOUT' });
+    try {
+      await authService.logout();
+    } finally {
+      dispatch({ type: 'LOGOUT' });
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, login, verifyTwoFA, oauthLogin, logout }}>
+    <AuthContext.Provider value={{ ...state, login, registerPatient, verifyTwoFA, oauthLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

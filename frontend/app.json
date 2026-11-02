@@ -3,17 +3,30 @@
     "name": "DENTALIS",
     "slug": "dentalis",
     "version": "1.0.0",
-    "sdkVersion": "57.0.0",
+    "sdkVersion": "58.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "com.dentalis.app",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dentalis.app"
+      "bundleIdentifier": "com.dentalis.app",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "DENTALIS se conecta a la API de la clínica en la red local durante las pruebas.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "192.168.100.34": {
+              "NSIncludesSubdomains": false,
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
+      }
     },
     "android": {
       "package": "com.dentalis.app",
+      "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -27,7 +40,23 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-asset",
+      "expo-status-bar",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.721085208228-34q0kchuv5om9b5sscrb1i9g7ficfs8o"
+        }
+      ],
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "2226433624961976",
+          "displayName": "DENTALIS",
+          "scheme": "fb2226433624961976"
+        }
+      ]
     ],
     "extra": {
       "eas": {

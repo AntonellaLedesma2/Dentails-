@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useAuth } from '../../context/AuthContext';
@@ -8,13 +9,13 @@ import Button from '../../components/Button';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const PROVIDERS = {
   google: {
     label: 'Google',
     icon: '🌐',
-    clientId: Platform.OS === 'web'
-      ? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
-      : process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '721085208228-nej5f804cd8frbdsl43tg8ej4lql3q7g.apps.googleusercontent.com',
+    // The native Google SDK returns an ID token whose audience is the server (web) client.
+    clientId: GOOGLE_WEB_CLIENT_ID,
     discovery: {
       authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenEndpoint: 'https://oauth2.googleapis.com/token',
@@ -24,7 +25,9 @@ const PROVIDERS = {
   github: {
     label: 'GitHub',
     icon: '🐙',
-    clientId: process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID || 'Ov23ct5VVwItyH442s5I',
+    clientId: Platform.OS === 'web'
+      ? process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID
+      : process.env.EXPO_PUBLIC_GITHUB_NATIVE_CLIENT_ID,
     discovery: {
       authorizationEndpoint: 'https://github.com/login/oauth/authorize',
       tokenEndpoint: 'https://github.com/login/oauth/access_token',
@@ -43,13 +46,31 @@ const PROVIDERS = {
   },
 };
 
+const isExpoGo = Platform.OS !== 'web' && (
+  Constants.executionEnvironment === 'storeClient'
+  || Constants.appOwnership === 'expo'
+);
+
+function getOAuthErrorMessage(error) {
+  const serverMessage = error.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+    const apiUrl = error.config?.baseURL || 'la URL configurada en frontend/.env';
+    return `No se pudo conectar con el servidor (${apiUrl}). Verificá que el backend esté iniciado, que el teléfono y la PC estén en la misma red Wi‑Fi y que EXPO_PUBLIC_API_URL_NATIVE tenga la IP actual de la PC.`;
+  }
+  return error.message || 'No se pudo completar el inicio de sesión. Revisá la configuración del proveedor.';
+}
+
 export default function OAuthLoginScreen({ route, navigation }) {
   const { provider: providerKey } = route.params;
   const { oauthLogin } = useAuth();
   const [status, setStatus] = useState('Tocá el botón para continuar con tu proveedor.');
   const [loading, setLoading] = useState(false);
+  const processedCodeRef = useRef(null);
   const provider = PROVIDERS[providerKey];
-  const redirectUri = AuthSession.makeRedirectUri({ native: 'com.dentalis.app://oauth' });
+  const redirectUri = Platform.OS === 'web'
+    ? (process.env.EXPO_PUBLIC_OAUTH_REDIRECT_URI_WEB || AuthSession.makeRedirectUri())
+    : AuthSession.makeRedirectUri({ native: 'com.dentalis.app://oauth' });
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -63,8 +84,11 @@ export default function OAuthLoginScreen({ route, navigation }) {
   );
 
   useEffect(() => {
-    async function handleResponse() {
+    async function handleWebOrGitHubResponse() {
       if (!response) return;
+      const responseCode = response.params?.code;
+      if (response.type === 'success' && responseCode && processedCodeRef.current === responseCode) return;
+      if (response.type === 'success' && responseCode) processedCodeRef.current = responseCode;
       if (response.type === 'cancel' || response.type === 'dismiss') {
         setLoading(false);
         setStatus('Inicio de sesión cancelado.');
@@ -72,13 +96,13 @@ export default function OAuthLoginScreen({ route, navigation }) {
         return;
       }
       if (response.type !== 'success') {
-        Alert.alert('Error', response.error?.message || `No se pudo autenticar con ${provider.label}.`);
+        Alert.alert('Error', response.error?.message || `No se pudo autenticar con ${provider?.label || 'el proveedor'}.`);
         setLoading(false);
         navigation.goBack();
         return;
       }
 
-      const code = response.params?.code;
+      const code = responseCode;
       if (!code || !request?.codeVerifier) {
         Alert.alert('Error', 'El proveedor no devolvió un código válido. Intentá de nuevo.');
         setLoading(false);
@@ -88,30 +112,115 @@ export default function OAuthLoginScreen({ route, navigation }) {
 
       setStatus('Verificando con el servidor...');
       try {
-        await oauthLogin(providerKey, code, redirectUri, request.codeVerifier, provider.clientId);
+        const result = await oauthLogin(providerKey, {
+          code,
+          redirectUri,
+          codeVerifier: request.codeVerifier,
+          clientId: provider.clientId,
+        });
+        if (result?.twoFARequired) navigation.navigate('TwoFA', { userId: result.userId });
       } catch (err) {
-        const message = err.response?.data?.message || 'No se pudo completar el inicio de sesión.';
+        const message = getOAuthErrorMessage(err);
         Alert.alert('Error al iniciar sesión', message);
         setLoading(false);
-        navigation.goBack();
+        setStatus(message);
       }
     }
-    handleResponse();
+    handleWebOrGitHubResponse();
   }, [response, request, provider, providerKey, redirectUri, oauthLogin, navigation]);
 
-  async function startLogin() {
-    if (!request || loading) return;
-    setLoading(true);
-    setStatus(`Abriendo ${provider.label}...`);
-    try {
-      const result = await promptAsync();
-      if (result.type !== 'success') setLoading(false);
-    } catch (error) {
+  async function startNativeGoogle() {
+    const { TurboModuleRegistry } = require('react-native');
+    if (!TurboModuleRegistry.get('RNGoogleSignin')) {
+      const error = new Error('Google nativo no está incluido en esta aplicación. Expo Go no admite este módulo; instalá el build de desarrollo de DENTALIS.');
+      error.code = 'GOOGLE_NATIVE_MODULE_MISSING';
+      throw error;
+    }
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      scopes: ['email', 'profile'],
+    });
+    const googleAuthResult = await GoogleSignin.signIn();
+    if (googleAuthResult.type === 'cancelled') {
       setLoading(false);
-      setStatus('No se pudo abrir el inicio de sesión.');
-      Alert.alert('Error', error.message || 'No se pudo abrir el proveedor.');
+      return;
+    }
+    const idToken = googleAuthResult.data?.idToken;
+    if (!idToken) throw new Error('Google no devolvió un ID token. Revisá los clientes OAuth de iOS/Android.');
+    const result = await oauthLogin('google', { idToken, clientId: GOOGLE_WEB_CLIENT_ID });
+    if (result?.twoFARequired) navigation.navigate('TwoFA', { userId: result.userId });
+  }
+
+  async function startNativeFacebook() {
+    const { AccessToken, LoginManager } = require('react-native-fbsdk-next');
+    const facebookAuthResult = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+    if (facebookAuthResult.isCancelled) {
+      setLoading(false);
+      return;
+    }
+    const token = await AccessToken.getCurrentAccessToken();
+    if (!token?.accessToken) throw new Error('Facebook no devolvió un token de acceso.');
+    const loginResult = await oauthLogin('facebook', {
+      accessToken: token.accessToken.toString(),
+      clientId: process.env.EXPO_PUBLIC_FACEBOOK_APP_ID,
+    });
+    if (loginResult?.twoFARequired) navigation.navigate('TwoFA', { userId: loginResult.userId });
+  }
+
+  async function startLogin() {
+    if (loading) return;
+    if (isExpoGo) {
+      Alert.alert(
+        'Se necesita la app de desarrollo',
+        'Expo Go no admite estos retornos OAuth nativos. Para iniciar sesión social en iPhone o Android necesitás instalar una compilación de desarrollo de DENTALIS. La versión web sí funciona desde la computadora o el navegador del teléfono.'
+      );
+      return;
+    }
+
+    setLoading(true);
+    setStatus(`Abriendo ${provider?.label || 'el proveedor'}...`);
+    try {
+      if (Platform.OS !== 'web' && providerKey === 'google') {
+        await startNativeGoogle();
+      } else if (Platform.OS !== 'web' && providerKey === 'facebook') {
+        await startNativeFacebook();
+      } else {
+        if (!request) throw new Error('La solicitud de autenticación todavía se está preparando.');
+        const result = await promptAsync();
+        if (result.type !== 'success') setLoading(false);
+      }
+    } catch (error) {
+      if (error.code === 'GOOGLE_NATIVE_MODULE_MISSING') {
+        setLoading(false);
+        setStatus(error.message);
+        Alert.alert('Se necesita DENTALIS de desarrollo', error.message);
+        return;
+      }
+      if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'ERR_CANCELED') {
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      const message = getOAuthErrorMessage(error);
+      setStatus(message);
+      Alert.alert('Error al iniciar sesión', message);
     }
   }
+
+  const nativeProviderSetupMissing = Platform.OS !== 'web' && providerKey === 'github'
+    && !process.env.EXPO_PUBLIC_GITHUB_NATIVE_CLIENT_ID;
+  const nativeGoogleSetupMissing = Platform.OS !== 'web' && providerKey === 'google'
+    && (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+      || (Platform.OS === 'ios' && !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID)
+      || (Platform.OS === 'android' && !process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID));
+  const nativeFacebookSetupMissing = Platform.OS !== 'web' && providerKey === 'facebook'
+    && !process.env.EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN;
+  const configured = Boolean(provider?.clientId)
+    && !nativeProviderSetupMissing
+    && !nativeGoogleSetupMissing
+    && !nativeFacebookSetupMissing;
 
   return (
     <View style={styles.container}>
@@ -119,17 +228,23 @@ export default function OAuthLoginScreen({ route, navigation }) {
       <Text style={styles.title}>Iniciar sesión con {provider?.label || 'tu cuenta'}</Text>
       {loading && <ActivityIndicator size="large" color={Colors.primary} style={styles.spinner} />}
       <Text style={styles.status}>
-        {!provider?.clientId
-          ? providerKey === 'google'
-            ? 'Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Configurá un cliente OAuth de tipo Web para Chrome.'
-            : `Falta configurar el ID de ${provider?.label || 'este proveedor'}.`
-          : status}
+        {!configured
+          ? nativeProviderSetupMissing
+            ? 'Falta crear un OAuth App de GitHub para móvil y configurar su ID en frontend/.env.'
+            : nativeFacebookSetupMissing
+              ? 'Falta EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN. Obtenelo en Meta Developers → Configuración de la app → Avanzada.'
+              : nativeGoogleSetupMissing
+                ? 'Falta el cliente OAuth de Google para esta plataforma en frontend/.env.'
+            : `Falta configurar las credenciales de ${provider?.label || 'este proveedor'} en frontend/.env.`
+          : isExpoGo
+            ? 'Para usar redes sociales en el teléfono, abrí DENTALIS en una compilación de desarrollo; Expo Go no admite el retorno OAuth nativo.'
+            : status}
       </Text>
       <Text style={styles.redirect}>Retorno configurado: {redirectUri}</Text>
       <Button
         title={`Continuar con ${provider?.label || 'el proveedor'}`}
         onPress={startLogin}
-        disabled={!request || !provider?.clientId}
+        disabled={!configured || loading}
         loading={loading}
         style={styles.loginButton}
       />

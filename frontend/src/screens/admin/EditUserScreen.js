@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import userService from '../../services/userService';
@@ -25,7 +26,7 @@ export default function EditUserScreen({ route, navigation }) {
         const data = await userService.getById(userId);
         setUser(data);
         setRol(data.rol);
-      } catch (err) {
+} catch {
         Alert.alert('Error', 'No se pudo cargar el usuario');
         navigation.goBack();
       } finally {
@@ -33,7 +34,7 @@ export default function EditUserScreen({ route, navigation }) {
       }
     }
     load();
-  }, [userId]);
+}, [userId, navigation]);
 
   async function handleSave() {
     if (rol === user.rol) {
@@ -66,7 +67,7 @@ export default function EditUserScreen({ route, navigation }) {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <TrackedScrollView contentContainerStyle={styles.container}>
         {/* Info del usuario */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
@@ -107,7 +108,7 @@ export default function EditUserScreen({ route, navigation }) {
           disabled={rol === user.rol}
           style={styles.btn}
         />
-      </ScrollView>
+      </TrackedScrollView>
     </KeyboardAvoidingView>
   );
 }

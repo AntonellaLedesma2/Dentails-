@@ -6,10 +6,11 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Modal, Platform,
+  Modal, useWindowDimensions,
 } from 'react-native';
-import Svg, { Path, G, Text as SvgText, Rect, Ellipse } from 'react-native-svg';
+import Svg, { Path, G } from 'react-native-svg';
 import Colors from '../constants/colors';
+import { useAppUi } from '../context/AppUiContext';
 
 // ─── Configuración de estados ──────────────────────────────────────────────────
 const ESTADO_CONFIG = {
@@ -19,6 +20,15 @@ const ESTADO_CONFIG = {
   completado: { fill: '#BBF7D0', stroke: '#22C55E', label: 'Completado' },
   extraccion: { fill: '#FECACA', stroke: '#EF4444', label: 'Extracción' },
   ausente:    { fill: '#F3F4F6', stroke: '#9CA3AF', label: 'Ausente' },
+};
+
+const ESTADO_CONFIG_DARK = {
+  sano:       { fill: '#263244', stroke: '#CAD5E3', label: 'Sano' },
+  evaluado:   { fill: '#1E3A68', stroke: '#8CB8FF', label: 'Evaluado' },
+  en_curso:   { fill: '#59400F', stroke: '#F5C84C', label: 'En curso' },
+  completado: { fill: '#174A3A', stroke: '#69D4A8', label: 'Completado' },
+  extraccion: { fill: '#5B2630', stroke: '#F18A96', label: 'Extracción' },
+  ausente:    { fill: '#222C3B', stroke: '#8795A9', label: 'Ausente' },
 };
 
 const ESTADOS_LIST = Object.keys(ESTADO_CONFIG);
@@ -139,8 +149,8 @@ function getToothType(num) {
   return 'incisor_central';
 }
 
-function ToothShape({ num, estado = 'sano', flipped = false }) {
-  const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.sano;
+function ToothShape({ num, estado = 'sano', flipped = false, width = 28, configMap = ESTADO_CONFIG }) {
+  const config = configMap[estado] || configMap.sano;
   const { fill, stroke } = config;
   const type = getToothType(num);
 
@@ -155,8 +165,8 @@ function ToothShape({ num, estado = 'sano', flipped = false }) {
 
   return (
     <Svg
-      width={28}
-      height={42}
+      width={width}
+      height={width * 1.5}
       viewBox="0 0 28 42"
       style={flipped ? { transform: [{ scaleY: -1 }] } : undefined}
     >
@@ -166,25 +176,25 @@ function ToothShape({ num, estado = 'sano', flipped = false }) {
 }
 
 // ─── Componente de un diente completo (forma + número + estado) ───────────────
-function Tooth({ number, estado = 'sano', onPress, isUpper }) {
-  const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.sano;
+function Tooth({ number, estado = 'sano', onPress, isUpper, width = 28, configMap = ESTADO_CONFIG, numberColor }) {
+  const config = configMap[estado] || configMap.sano;
   const isAbsent = estado === 'ausente';
 
   return (
     <TouchableOpacity
       onPress={() => onPress && onPress(number)}
-      style={[styles.toothWrapper, isAbsent && styles.toothAbsent]}
+      style={[styles.toothWrapper, { width }, isAbsent && styles.toothAbsent]}
       accessibilityLabel={`Diente ${number}: ${config.label}`}
     >
       {isUpper ? (
         <>
-          <ToothShape num={number} estado={estado} flipped={false} />
-          <Text style={styles.toothNum}>{number}</Text>
+          <ToothShape num={number} estado={estado} flipped={false} width={width} configMap={configMap} />
+          <Text style={[styles.toothNum, numberColor && { color: numberColor }, { fontSize: Math.max(6, Math.min(8, width * 0.29)) }]}>{number}</Text>
         </>
       ) : (
         <>
-          <Text style={styles.toothNum}>{number}</Text>
-          <ToothShape num={number} estado={estado} flipped={true} />
+          <Text style={[styles.toothNum, numberColor && { color: numberColor }, { fontSize: Math.max(6, Math.min(8, width * 0.29)) }]}>{number}</Text>
+          <ToothShape num={number} estado={estado} flipped={true} width={width} configMap={configMap} />
         </>
       )}
     </TouchableOpacity>
@@ -202,12 +212,22 @@ const LOWER = [[48,47,46,45,44,43,42,41], [31,32,33,34,35,36,37,38]];
  *   onToothPress: (num, estadoActual) => void
  *   readOnly: boolean
  */
-export default function Odontogram({ estados = {}, onToothPress, readOnly = false }) {
+export default function Odontogram({ estados = {}, onToothPress, readOnly = false, manageStateExternally = false }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [selected, setSelected]         = useState(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const { width: screenWidth } = useWindowDimensions();
+  const { colors, mode } = useAppUi();
+  const configMap = mode === 'dark' ? ESTADO_CONFIG_DARK : ESTADO_CONFIG;
+  const availableWidth = Math.max(0, (containerWidth || screenWidth - 64) - 24);
+  const toothWidth = Math.min(28, availableWidth / 16);
 
   function handlePress(num) {
     if (readOnly) return;
+    if (manageStateExternally && onToothPress) {
+      onToothPress(num, estados[num] || 'sano');
+      return;
+    }
     setSelected(num);
     setModalVisible(true);
   }
@@ -221,23 +241,23 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]} onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}>
       {/* Leyenda */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.legend}>
         {ESTADOS_LIST.map((e) => {
-          const cfg = ESTADO_CONFIG[e];
+          const cfg = configMap[e];
           return (
             <View key={e} style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: cfg.fill, borderColor: cfg.stroke }]} />
-              <Text style={styles.legendLabel}>{cfg.label}</Text>
+              <Text style={[styles.legendLabel, { color: colors.muted }]}>{cfg.label}</Text>
             </View>
           );
         })}
       </ScrollView>
 
       {/* Superior */}
-      <Text style={styles.arcLabel}>Arcada superior</Text>
-      <View style={styles.arcRow}>
+      <Text style={[styles.arcLabel, { color: colors.muted }]}>Arcada superior</Text>
+      <View style={[styles.arcRow, screenWidth < 640 ? styles.arcRowCompact : styles.arcRowWide]}>
         {[...UPPER[0], ...UPPER[1]].map((num) => (
           <Tooth
             key={num}
@@ -245,15 +265,18 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
             estado={estados[num] || 'sano'}
             onPress={handlePress}
             isUpper={true}
+            width={toothWidth}
+            configMap={configMap}
+            numberColor={colors.muted}
           />
         ))}
       </View>
 
       {/* Separador */}
-      <View style={styles.midline} />
+      <View style={[styles.midline, { backgroundColor: colors.border }]} />
 
       {/* Inferior */}
-      <View style={styles.arcRow}>
+      <View style={[styles.arcRow, screenWidth < 640 ? styles.arcRowCompact : styles.arcRowWide]}>
         {[...LOWER[0], ...LOWER[1]].map((num) => (
           <Tooth
             key={num}
@@ -261,13 +284,16 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
             estado={estados[num] || 'sano'}
             onPress={handlePress}
             isUpper={false}
+            width={toothWidth}
+            configMap={configMap}
+            numberColor={colors.muted}
           />
         ))}
       </View>
-      <Text style={styles.arcLabel}>Arcada inferior</Text>
+      <Text style={[styles.arcLabel, { color: colors.muted }]}>Arcada inferior</Text>
 
-      {!readOnly && (
-        <Text style={styles.hint}>Tocá un diente para cambiar su estado</Text>
+      {!readOnly && !manageStateExternally && (
+        <Text style={[styles.hint, { color: colors.muted }]}>Tocá un diente para cambiar su estado</Text>
       )}
 
       {/* Modal selector de estado */}
@@ -278,14 +304,14 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Diente {selected}</Text>
-            <Text style={styles.modalSub}>
-              Estado actual: {ESTADO_CONFIG[estados[selected] || 'sano']?.label}
+          <View style={[styles.modalBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Diente {selected}</Text>
+            <Text style={[styles.modalSub, { color: colors.muted }]}>
+              Estado actual: {configMap[estados[selected] || 'sano']?.label}
             </Text>
             <View style={styles.estadoGrid}>
               {ESTADOS_LIST.map((e) => {
-                const cfg = ESTADO_CONFIG[e];
+                const cfg = configMap[e];
                 const isActive = (estados[selected] || 'sano') === e;
                 return (
                   <TouchableOpacity
@@ -293,17 +319,17 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
                     style={[
                       styles.estadoBtn,
                       { backgroundColor: cfg.fill, borderColor: cfg.stroke },
-                      isActive && styles.estadoBtnActive,
+                      isActive && [styles.estadoBtnActive, { borderColor: colors.primary, backgroundColor: colors.soft }],
                     ]}
                     onPress={() => handleEstado(e)}
                   >
-                    <Text style={[styles.estadoBtnText, { color: cfg.stroke }]}>{cfg.label}</Text>
+                    <Text style={[styles.estadoBtnText, { color: isActive ? colors.primary : cfg.stroke }]}>{cfg.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-              <Text style={styles.cancelText}>Cancelar</Text>
+            <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: colors.soft }]} onPress={() => setModalVisible(false)}>
+              <Text style={[styles.cancelText, { color: colors.muted }]}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -314,6 +340,7 @@ export default function Odontogram({ estados = {}, onToothPress, readOnly = fals
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
     backgroundColor: Colors.card,
     borderRadius: 14,
     padding: 12,
@@ -341,10 +368,11 @@ const styles = StyleSheet.create({
   },
   arcRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 1,
+    width: '100%',
     flexWrap: 'nowrap',
   },
+  arcRowCompact: { justifyContent: 'space-between', gap: 0 },
+  arcRowWide: { justifyContent: 'center', gap: 1 },
   midline: {
     height: 2,
     backgroundColor: Colors.border,
@@ -355,7 +383,8 @@ const styles = StyleSheet.create({
   // Diente
   toothWrapper: {
     alignItems: 'center',
-    paddingHorizontal: 1,
+    flexShrink: 0,
+    paddingHorizontal: 0,
   },
   toothAbsent: { opacity: 0.3 },
   toothNum: {

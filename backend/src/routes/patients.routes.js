@@ -3,7 +3,7 @@ const { body, query } = require('express-validator');
 const router = express.Router();
 
 const {
-  getPatients, getPatientById, createPatient, updatePatient, deactivatePatient,
+  getPatients, getPatientById, createPatient, updatePatient, deactivatePatient, changePatientStatus,
 } = require('../controllers/patients.controller');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validate } = require('../middlewares/validate.middleware');
@@ -42,5 +42,14 @@ router.put(
 
 // DELETE /api/patients/:id  → soft delete (solo admin)
 router.delete('/:id', authorize('administrador'), deactivatePatient);
+
+// PATCH /api/patients/:id/estado → activar o desactivar (solo admin)
+router.patch(
+  '/:id/estado',
+  authorize('administrador'),
+  [body('estado').isIn(['activo', 'inactivo']).withMessage('Estado inválido')],
+  validate,
+  (req, res, next) => changePatientStatus(req, res, next)
+);
 
 module.exports = router;

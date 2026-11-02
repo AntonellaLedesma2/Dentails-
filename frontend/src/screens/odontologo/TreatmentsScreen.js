@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedFlatList } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import treatmentService from '../../services/treatmentService';
 import treatmentCatalogService from '../../services/treatmentCatalogService';
-import StatusBadge from '../../components/StatusBadge';
-import Card from '../../components/Card';
 import Colors from '../../constants/colors';
 
 const ESTADO_COLORS = {
@@ -47,11 +46,18 @@ export default function TreatmentsScreen({ route, navigation }) {
     }
   }, [patientId]);
 
-  useEffect(() => {
-    fetch();
-    const unsub = navigation.addListener('focus', fetch);
-    return unsub;
-  }, [fetch, navigation]);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    void fetch();
+  }, 0);
+
+  const unsubscribe = navigation.addListener('focus', fetch);
+
+  return () => {
+    clearTimeout(timer);
+    unsubscribe();
+  };
+}, [fetch, navigation]);
 
   function renderItem({ item }) {
     const theme = ESTADO_COLORS[item.estado] || { bg: Colors.gray[100], text: Colors.gray[500] };
@@ -86,7 +92,7 @@ export default function TreatmentsScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <TrackedFlatList
         data={treatments}
         keyExtractor={(t) => String(t.id)}
         renderItem={renderItem}

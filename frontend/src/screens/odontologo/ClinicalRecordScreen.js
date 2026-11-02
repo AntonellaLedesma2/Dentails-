@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { TrackedScrollView } from '../../components/TrackedScroll';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, RefreshControl, Modal,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import clinicalRecordService from '../../services/clinicalRecordService';
 import patientService        from '../../services/patientService';
 import Odontogram            from '../../components/Odontogram';
+import DentalModel3D         from '../../components/DentalModel3D';
 import Card                  from '../../components/Card';
 import Button                from '../../components/Button';
 import Input                 from '../../components/Input';
 import Colors                from '../../constants/colors';
+import { useAppUi } from '../../context/AppUiContext';
 
 const ESTADOS_DIENTE = ['sano','evaluado','en_curso','completado','extraccion','ausente'];
 const ESTADO_LABELS  = {
@@ -20,6 +23,7 @@ const ESTADO_LABELS  = {
 
 export default function ClinicalRecordScreen({ route, navigation }) {
   const { patientId } = route.params;
+  const { colors, mode } = useAppUi();
 
   const [patient, setPatient]         = useState(null);
   const [record, setRecord]           = useState(null);
@@ -28,6 +32,7 @@ export default function ClinicalRecordScreen({ route, navigation }) {
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
   const [saving, setSaving]           = useState(false);
+  const [odontogramView, setOdontogramView] = useState('2d');
 
   // Modal nueva consulta
   const [modalVisible, setModalVisible] = useState(false);
@@ -50,15 +55,18 @@ export default function ClinicalRecordScreen({ route, navigation }) {
       setConsultas(data.consultas || []);
       setOdontograma(data.odontograma || {});
       navigation.setOptions({ title: `${pat.apellido}, ${pat.nombre}` });
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'No se pudo cargar la ficha');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [patientId]);
+  }, [patientId, navigation]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', load);
+    return unsubscribe;
+  }, [navigation, load]);
 
   // Tocar un diente → abrir selector de estado
   function handleToothPress(number) {
@@ -95,24 +103,24 @@ export default function ClinicalRecordScreen({ route, navigation }) {
     }
   }
 
-  if (loading) return <View style={s.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
+  if (loading) return <View style={[s.centered, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   return (
     <>
-      <ScrollView
-        style={s.container}
+      <TrackedScrollView
+        style={[s.container, { backgroundColor: colors.background }]}
         contentContainerStyle={s.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         {/* Info del paciente */}
-        <View style={s.patientHeader}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{patient?.nombre?.[0]}{patient?.apellido?.[0]}</Text>
+        <View style={[s.patientHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[s.avatar, { backgroundColor: colors.soft, borderColor: colors.primary }]}>
+            <Text style={[s.avatarText, { color: colors.primary }]}>{patient?.nombre?.[0]}{patient?.apellido?.[0]}</Text>
           </View>
           <View>
-            <Text style={s.patientName}>{patient?.apellido}, {patient?.nombre}</Text>
+            <Text style={[s.patientName, { color: colors.text }]}>{patient?.apellido}, {patient?.nombre}</Text>
             {patient?.fecha_nacimiento && (
-              <Text style={s.patientMeta}>
+              <Text style={[s.patientMeta, { color: colors.muted }]}>
                 {new Date(patient.fecha_nacimiento).toLocaleDateString('es-AR')}
               </Text>
             )}
@@ -122,16 +130,16 @@ export default function ClinicalRecordScreen({ route, navigation }) {
         {/* Antecedentes */}
         <Card title="Antecedentes médicos" style={s.card}>
           {record?.antecedentes
-            ? <Text style={s.bodyText}>{record.antecedentes}</Text>
-            : <Text style={s.emptyText}>Sin antecedentes registrados</Text>}
+            ? <Text style={[s.bodyText, { color: colors.text }]}>{record.antecedentes}</Text>
+            : <Text style={[s.emptyText, { color: colors.muted }]}>Sin antecedentes registrados</Text>}
           {record?.alergias && (
-            <View style={s.alertRow}>
+            <View style={[s.alertRow, { backgroundColor: mode === 'dark' ? '#442A32' : Colors.errorLight }]}>
               <Text style={s.alertIcon}>⚠️</Text>
-              <Text style={s.alertText}>Alergias: {record.alergias}</Text>
+              <Text style={[s.alertText, { color: mode === 'dark' ? '#FFB4BD' : Colors.error }]}>Alergias: {record.alergias}</Text>
             </View>
           )}
           {record?.medicacion && (
-            <Text style={s.bodyText}>💊 Medicación: {record.medicacion}</Text>
+            <Text style={[s.bodyText, { color: colors.text }]}>💊 Medicación: {record.medicacion}</Text>
           )}
           <Button
             title="Editar antecedentes"
@@ -143,21 +151,40 @@ export default function ClinicalRecordScreen({ route, navigation }) {
         </Card>
 
         {/* Odontograma */}
-        <Text style={s.sectionLabel}>ODONTOGRAMA</Text>
+        <View style={s.odontogramHeading}>
+          <Text style={[s.sectionLabel, { color: colors.muted }]}>ODONTOGRAMA</Text>
+          <TouchableOpacity
+            style={[s.viewToggle, { backgroundColor: colors.soft }]}
+            accessibilityRole="button"
+            accessibilityLabel={odontogramView === '2d' ? 'Ver odontograma 3D' : 'Ver odontograma 2D'}
+            onPress={() => setOdontogramView((view) => view === '2d' ? '3d' : '2d')}
+          >
+            <Text style={[s.viewToggleText, { color: colors.primary }]}>{odontogramView === '2d' ? 'Ver modelo 3D' : 'Volver a 2D'}</Text>
+          </TouchableOpacity>
+        </View>
         <Card style={s.card}>
-          <Odontogram
-            estados={odontograma}
-            onToothPress={handleToothPress}
-            showDeciduous={false}
-          />
-          <Text style={s.odoHint}>Tocá un diente para cambiar su estado</Text>
+          {odontogramView === '2d' ? (
+            <Odontogram
+              estados={odontograma}
+              onToothPress={handleToothPress}
+              manageStateExternally
+              showDeciduous={false}
+            />
+          ) : (
+            <DentalModel3D states={odontograma} onToothPress={handleToothPress} />
+          )}
+          <Text style={[s.odoHint, { color: colors.muted }]}>
+            {odontogramView === '2d'
+              ? 'Tocá un diente para cambiar su estado'
+              : 'Arrastrá para girar · Usá dos dedos para acercar · Tocá un diente para editarlo'}
+          </Text>
         </Card>
 
         {/* Historial de consultas */}
         <View style={s.sectionRow}>
-          <Text style={s.sectionLabel}>CONSULTAS ({consultas.length})</Text>
+          <Text style={[s.sectionLabel, { color: colors.muted }]}>CONSULTAS ({consultas.length})</Text>
           <TouchableOpacity
-            style={s.addBtn}
+            style={[s.addBtn, { backgroundColor: mode === 'dark' ? '#315FC2' : Colors.primary }]}
             onPress={() => setModalVisible(true)}
           >
             <Text style={s.addBtnText}>+ Nueva</Text>
@@ -167,42 +194,42 @@ export default function ClinicalRecordScreen({ route, navigation }) {
         {consultas.length === 0 ? (
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📋</Text>
-            <Text style={s.emptyText}>Sin consultas registradas</Text>
+            <Text style={[s.emptyText, { color: colors.muted }]}>Sin consultas registradas</Text>
           </View>
         ) : (
           consultas.map((c) => (
-            <View key={c.id} style={s.consultaCard}>
+            <View key={c.id} style={[s.consultaCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={s.consultaHeader}>
-                <Text style={s.consultaFecha}>
+                <Text style={[s.consultaFecha, { color: colors.primary }]}>
                   {new Date(c.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </Text>
-                <Text style={s.consultaOdo}>{c.odontologo_nombre}</Text>
+                <Text style={[s.consultaOdo, { color: colors.muted }]}>{c.odontologo_nombre}</Text>
               </View>
-              {c.diagnostico   && <Text style={s.consultaField}><Text style={s.fieldLabel}>Diagnóstico: </Text>{c.diagnostico}</Text>}
-              {c.procedimiento && <Text style={s.consultaField}><Text style={s.fieldLabel}>Procedimiento: </Text>{c.procedimiento}</Text>}
-              {c.indicaciones  && <Text style={s.consultaField}><Text style={s.fieldLabel}>Indicaciones: </Text>{c.indicaciones}</Text>}
+              {c.diagnostico   && <Text style={[s.consultaField, { color: colors.text }]}><Text style={s.fieldLabel}>Diagnóstico: </Text>{c.diagnostico}</Text>}
+              {c.procedimiento && <Text style={[s.consultaField, { color: colors.text }]}><Text style={s.fieldLabel}>Procedimiento: </Text>{c.procedimiento}</Text>}
+              {c.indicaciones  && <Text style={[s.consultaField, { color: colors.text }]}><Text style={s.fieldLabel}>Indicaciones: </Text>{c.indicaciones}</Text>}
               {c.proxima_cita  && (
-                <View style={s.proxRow}>
+                <View style={[s.proxRow, { backgroundColor: colors.soft }]}>
                   <Text style={s.proxIcon}>📅</Text>
-                  <Text style={s.proxText}>Próxima cita: {new Date(c.proxima_cita).toLocaleDateString('es-AR')}</Text>
+                  <Text style={[s.proxText, { color: colors.primary }]}>Próxima cita: {new Date(c.proxima_cita).toLocaleDateString('es-AR')}</Text>
                 </View>
               )}
             </View>
           ))
         )}
-      </ScrollView>
+      </TrackedScrollView>
 
       {/* Modal: nueva consulta */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={s.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalBox}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[s.modalBox, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
             <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Nueva consulta</Text>
+              <Text style={[s.modalTitle, { color: colors.text }]}>Nueva consulta</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={s.modalClose}>✕</Text>
+                <Text style={[s.modalClose, { color: colors.muted }]}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <TrackedScrollView keyboardShouldPersistTaps="handled">
               <Input label="Diagnóstico *" value={consultaForm.diagnostico}
                 onChangeText={(v) => setConsultaForm((f) => ({ ...f, diagnostico: v }))}
                 multiline numberOfLines={2} style={{ minHeight: 60, textAlignVertical: 'top' }} />
@@ -215,7 +242,7 @@ export default function ClinicalRecordScreen({ route, navigation }) {
                 onChangeText={(v) => setConsultaForm((f) => ({ ...f, proximaCita: v }))}
                 placeholder="2024-04-10" keyboardType="numeric" />
               <Button title="Guardar consulta" onPress={handleAddConsulta} loading={saving} />
-            </ScrollView>
+            </TrackedScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
@@ -223,22 +250,24 @@ export default function ClinicalRecordScreen({ route, navigation }) {
       {/* Modal: cambiar estado de diente */}
       <Modal visible={toothModal} animationType="fade" transparent onRequestClose={() => setToothModal(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalBox, { padding: 20 }]}>
-            <Text style={s.modalTitle}>Diente {selectedTooth}</Text>
-            <Text style={s.modalSubtitle}>Estado actual: {ESTADO_LABELS[odontograma[selectedTooth] || 'sano']}</Text>
+          <View style={[s.modalBox, { padding: 20, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>Diente {selectedTooth}</Text>
+            <Text style={[s.modalSubtitle, { color: colors.muted }]}>Estado actual: {ESTADO_LABELS[odontograma[selectedTooth] || 'sano']}</Text>
             <View style={s.estadoGrid}>
               {ESTADOS_DIENTE.map((e) => (
                 <TouchableOpacity
                   key={e}
                   style={[
                     s.estadoChip,
-                    (odontograma[selectedTooth] || 'sano') === e && s.estadoChipActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    (odontograma[selectedTooth] || 'sano') === e && [s.estadoChipActive, { backgroundColor: colors.soft, borderColor: colors.primary }],
                   ]}
                   onPress={() => handleSetToothEstado(e)}
                 >
                   <Text style={[
                     s.estadoChipText,
-                    (odontograma[selectedTooth] || 'sano') === e && s.estadoChipTextActive,
+                    { color: colors.muted },
+                    (odontograma[selectedTooth] || 'sano') === e && [s.estadoChipTextActive, { color: colors.primary }],
                   ]}>
                     {ESTADO_LABELS[e]}
                   </Text>
@@ -289,6 +318,9 @@ const s = StyleSheet.create({
   addBtnText: { fontSize: 13, color: Colors.white, fontWeight: '600' },
 
   odoHint: { fontSize: 11, color: Colors.text.label, textAlign: 'center', marginTop: 8 },
+  odontogramHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  viewToggle: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: Colors.primaryLight },
+  viewToggleText: { fontSize: 12, color: Colors.primaryDark, fontWeight: '700' },
 
   bodyText:  { fontSize: 14, color: Colors.text.primary, lineHeight: 20 },
   emptyText: { fontSize: 13, color: Colors.text.secondary, fontStyle: 'italic' },

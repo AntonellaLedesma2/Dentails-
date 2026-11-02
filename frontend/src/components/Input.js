@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Colors from '../constants/colors';
+import { useAppUi } from '../context/AppUiContext';
 
 export default function Input({
   label,
@@ -11,27 +12,29 @@ export default function Input({
   style,
   containerStyle,
   themeColors,
+  showFocusStyle = true,
   ...props
 }) {
+  const { colors } = useAppUi();
   const [visible, setVisible] = useState(false);
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={[styles.label, themeColors?.label && { color: themeColors.label }]}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: themeColors?.label || colors.muted }]}>{label}</Text>}
       <View style={[
         styles.inputWrapper,
-        themeColors && {
-          backgroundColor: themeColors.inputBackground,
-          borderColor: themeColors.inputBorder,
+        {
+          backgroundColor: themeColors?.inputBackground || colors.surface,
+          borderColor: themeColors?.inputBorder || colors.border,
         },
-        focused && styles.inputFocused,
-        error  && styles.inputError,
+        focused && showFocusStyle && [styles.inputFocused, { borderColor: colors.primary, shadowColor: colors.primary }],
+        error && !focused && styles.inputError,
       ]}>
         {leftIcon && <Text style={styles.leftIcon}>{leftIcon}</Text>}
         <TextInput
-          style={[styles.input, themeColors?.text && { color: themeColors.text }, leftIcon && styles.inputWithIcon, style]}
-          placeholderTextColor={themeColors?.placeholder || Colors.text.disabled}
+          style={[styles.input, { color: themeColors?.text || colors.text }, leftIcon && styles.inputWithIcon, style]}
+          placeholderTextColor={themeColors?.placeholder || colors.muted}
           secureTextEntry={secureTextEntry && !visible}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

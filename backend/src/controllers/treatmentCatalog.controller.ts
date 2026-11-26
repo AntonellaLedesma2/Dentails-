@@ -1,3 +1,4 @@
+export {};
 const TreatmentCatalogModel = require('../models/treatmentCatalog.model');
 
 async function getCatalog(req, res, next) {

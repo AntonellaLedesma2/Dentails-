@@ -1,5 +1,7 @@
+export {};
 const AppointmentModel = require('../models/appointment.model');
 const PatientModel = require('../models/patient.model');
+const UserModel = require('../models/user.model');
 const { logActivity } = require('../utils/activityLogger');
 
 function timeToMinutes(time) {
@@ -15,7 +17,7 @@ function normalizeDate(date) {
   return date instanceof Date ? date.toISOString().slice(0, 10) : String(date || '').slice(0, 10);
 }
 
-async function hasScheduleConflict({ fecha, hora, odontologoId, duracionMin, excludeId }) {
+async function hasScheduleConflict({ fecha, hora, odontologoId, duracionMin, excludeId = null }) {
   const start = timeToMinutes(hora);
   const duration = Number(duracionMin);
   if (start === null || !Number.isInteger(duration) || duration < 1 || start + duration > 24 * 60) {
@@ -35,6 +37,18 @@ async function hasScheduleConflict({ fecha, hora, odontologoId, duracionMin, exc
   });
 
   return conflict ? { conflict } : null;
+}
+
+async function dentistUnavailable(odontologoId, fecha) {
+  const dentist = await UserModel.findDentistAvailability(odontologoId);
+  if (!dentist || dentist.estado !== 'activo') return 'El odontólogo no está disponible';
+  const until = normalizeDate(dentist.disponibilidad_hasta);
+  const appointmentDate = normalizeDate(fecha);
+  const unavailable = dentist.disponibilidad && dentist.disponibilidad !== 'disponible'
+    && (!until || appointmentDate <= until);
+  if (!unavailable) return null;
+  const reason = dentist.disponibilidad === 'vacaciones' ? 'está de vacaciones' : (dentist.disponibilidad_motivo || 'no está disponible');
+  return `${dentist.nombre} ${dentist.apellido} ${reason}${until ? ` hasta el ${until}` : ''}`;
 }
 
 function sendScheduleConflict(res, result) {
@@ -71,7 +85,9 @@ async function getAppointments(req, res, next) {
 
 async function getAppointmentRequests(req, res, next) {
   try {
-    const appointments = await AppointmentModel.findAppointmentRequests();
+    const appointments = await AppointmentModel.findAppointmentRequests(
+      req.user.rol === 'odontologo' ? { odontologoId: req.user.id } : undefined
+    );
     return res.status(200).json({ appointments });
   } catch (err) { next(err); }
 }
@@ -109,6 +125,8 @@ async function createAppointment(req, res, next) {
       return res.status(422).json({ error: true, message: 'Seleccioná un paciente' });
     }
     const duracion = duracionMin ?? 30;
+    const unavailableMessage = await dentistUnavailable(odontologoId, fecha);
+    if (unavailableMessage) return res.status(409).json({ error: true, message: unavailableMessage });
     const scheduleResult = await hasScheduleConflict({
       fecha, hora, odontologoId, duracionMin: duracion,
     });
@@ -137,9 +155,24 @@ async function createAppointment(req, res, next) {
 async function updateAppointment(req, res, next) {
   try {
     const { id } = req.params;
-    const { estado, ...appointmentData } = req.body;
+    let { estado, ...appointmentData } = req.body;
     const currentAppointment = await AppointmentModel.findById(id);
     if (!currentAppointment) return res.status(404).json({ error: true, message: 'Turno no encontrado' });
+
+    if (req.user.rol === 'odontologo') {
+      const isOwnRequest = Number(currentAppointment.odontologo_id) === Number(req.user.id)
+        && Number(currentAppointment.creado_por) === Number(req.user.id);
+      if (!isOwnRequest) return res.status(403).json({ error: true, message: 'Solo podés editar solicitudes que hayas creado para tu propia agenda' });
+      if (currentAppointment.estado === 'realizado') return res.status(403).json({ error: true, message: 'No se puede editar un turno realizado' });
+      if (estado !== undefined && !(currentAppointment.estado !== 'pendiente' && estado === 'pendiente')) {
+        return res.status(403).json({ error: true, message: 'No podés cambiar el estado de esta solicitud' });
+      }
+      // Las propuestas aceptadas o rechazadas vuelven a recepción para revisar los cambios.
+      if (currentAppointment.estado !== 'pendiente') estado = 'pendiente';
+      // El odontólogo puede ajustar la propuesta, pero no reasignar paciente ni profesional.
+      delete appointmentData.pacienteId;
+      delete appointmentData.odontologoId;
+    }
 
     if (estado !== undefined) {
       const validEstados = ['pendiente', 'confirmado', 'cancelado', 'reprogramado', 'realizado'];
@@ -156,6 +189,11 @@ async function updateAppointment(req, res, next) {
       .some((field) => appointmentData[field] !== undefined);
     const reactivating = currentAppointment.estado === 'cancelado' && targetEstado !== 'cancelado';
     if (targetEstado !== 'cancelado' && (scheduleChanged || reactivating)) {
+      const unavailableMessage = await dentistUnavailable(
+        appointmentData.odontologoId ?? currentAppointment.odontologo_id,
+        appointmentData.fecha ?? currentAppointment.fecha
+      );
+      if (unavailableMessage) return res.status(409).json({ error: true, message: unavailableMessage });
       const scheduleResult = await hasScheduleConflict({
         fecha: appointmentData.fecha ?? currentAppointment.fecha,
         hora: appointmentData.hora ?? currentAppointment.hora,

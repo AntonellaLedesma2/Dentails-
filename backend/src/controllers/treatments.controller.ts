@@ -1,3 +1,4 @@
+export {};
 const TreatmentModel = require('../models/treatment.model');
 const ClinicalRecordModel = require('../models/clinicalRecord.model');
 const { logActivity } = require('../utils/activityLogger');

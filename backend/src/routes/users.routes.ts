@@ -1,3 +1,4 @@
+export {};
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
@@ -69,6 +70,14 @@ router.patch(
       .optional()
       .isIn(['activo', 'inactivo'])
       .withMessage('Estado inválido'),
+    body('disponibilidad')
+      .optional()
+      .isIn(['disponible', 'ausente', 'vacaciones'])
+      .withMessage('Disponibilidad inválida'),
+    body('disponibilidadHasta')
+      .optional({ nullable: true })
+      .isISO8601({ strict: true })
+      .withMessage('La fecha de regreso debe tener formato AAAA-MM-DD'),
   ],
   validate,
   updateUser

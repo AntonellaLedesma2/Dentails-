@@ -1,10 +1,28 @@
+export {};
 const pool = require('../config/db');
 
 const AppointmentModel = {
-  async findAppointmentRequests() {
+  async findAppointmentRequests({ odontologoId } = {} as any) {
+    if (odontologoId) {
+      const [rows] = await pool.execute(
+        `SELECT t.*, CONCAT(p.nombre, ' ', p.apellido) AS paciente_nombre,
+                p.telefono AS paciente_telefono, p.correo AS paciente_correo, p.dni AS paciente_dni,
+                CONCAT(u.nombre, ' ', u.apellido) AS odontologo_nombre,
+                CONCAT(c.nombre, ' ', c.apellido) AS solicitante_nombre
+         FROM turnos t
+         JOIN pacientes p ON p.id = t.paciente_id
+         JOIN usuarios u ON u.id = t.odontologo_id
+         JOIN usuarios c ON c.id = t.creado_por
+         WHERE t.creado_por = ? AND t.odontologo_id = ? AND c.rol = 'odontologo'
+         ORDER BY t.fecha DESC, t.hora DESC`,
+        [odontologoId, odontologoId]
+      );
+      return rows;
+    }
+
     const [rows] = await pool.execute(
       `SELECT t.*, CONCAT(p.nombre, ' ', p.apellido) AS paciente_nombre,
-              p.telefono AS paciente_telefono,
+              p.telefono AS paciente_telefono, p.correo AS paciente_correo, p.dni AS paciente_dni,
               CONCAT(u.nombre, ' ', u.apellido) AS odontologo_nombre,
               CONCAT(c.nombre, ' ', c.apellido) AS solicitante_nombre
        FROM turnos t
@@ -23,7 +41,7 @@ const AppointmentModel = {
     );
     return Boolean(rows[0]);
   },
-  async findAll({ fecha, odontologoId, estado, pacienteId } = {}) {
+  async findAll({ fecha, odontologoId, estado, pacienteId } = {} as any) {
     let where = 'WHERE 1=1';
     const params = [];
 

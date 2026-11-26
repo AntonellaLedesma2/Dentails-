@@ -1,3 +1,4 @@
+export {};
 /**
  * Middleware global de manejo de errores.
  * Debe registrarse al final de todos los middlewares y rutas.

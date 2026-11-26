@@ -1,3 +1,4 @@
+export {};
 const PatientModel = require('../models/patient.model');
 const { logActivity } = require('../utils/activityLogger');
 

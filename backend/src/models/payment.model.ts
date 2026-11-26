@@ -1,7 +1,8 @@
+export {};
 const pool = require('../config/db');
 
 const PaymentModel = {
-  async findAll({ pacienteId, odontologoId, desde, hasta } = {}) {
+  async findAll({ pacienteId, odontologoId, desde, hasta } = {} as any) {
     let where = 'WHERE 1=1';
     const params = [];
     if (pacienteId)   { where += ' AND pa.paciente_id = ?'; params.push(pacienteId); }

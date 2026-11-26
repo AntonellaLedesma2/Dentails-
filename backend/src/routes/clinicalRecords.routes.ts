@@ -1,3 +1,4 @@
+export {};
 const express = require('express');
 const router  = express.Router();
 const { getRecord, updateRecord, addConsulta, saveOdontograma } = require('../controllers/clinicalRecords.controller');

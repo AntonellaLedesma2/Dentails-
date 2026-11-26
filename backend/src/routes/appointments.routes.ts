@@ -1,3 +1,4 @@
+export {};
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
@@ -15,7 +16,7 @@ router.use(authenticate);
 
 // GET /api/appointments
 router.get('/', authorize('administrador', 'recepcion', 'odontologo'), getAppointments);
-router.get('/requests', authorize('administrador', 'recepcion'), getAppointmentRequests);
+router.get('/requests', authorize('administrador', 'recepcion', 'odontologo'), getAppointmentRequests);
 
 // GET /api/appointments/:id
 router.get('/:id', authorize('administrador', 'recepcion', 'odontologo'), getAppointmentById);
@@ -38,7 +39,7 @@ router.post(
 // PUT /api/appointments/:id
 router.put(
   '/:id',
-  authorize('administrador'),
+  authorize('administrador', 'odontologo'),
   [
     body('fecha').optional().matches(/^\d{4}-\d{2}-\d{2}$/),
     body('hora').optional().matches(/^\d{2}:\d{2}$/),

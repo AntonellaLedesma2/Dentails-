@@ -1,3 +1,4 @@
+export {};
 const PaymentModel = require('../models/payment.model');
 const { logActivity } = require('../utils/activityLogger');
 

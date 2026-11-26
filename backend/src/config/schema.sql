@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash VARCHAR(255) NOT NULL,
   rol           ENUM('administrador', 'recepcion', 'odontologo', 'usuario') NOT NULL DEFAULT 'recepcion',
   estado        ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
+  disponibilidad ENUM('disponible', 'ausente', 'vacaciones') NOT NULL DEFAULT 'disponible',
+  disponibilidad_hasta DATE,
+  disponibilidad_motivo VARCHAR(160),
   -- OAuth
   google_id     VARCHAR(255) UNIQUE,
   facebook_id   VARCHAR(255) UNIQUE,

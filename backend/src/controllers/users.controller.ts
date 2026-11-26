@@ -1,3 +1,4 @@
+export {};
 const bcrypt = require('bcryptjs');
 const UserModel = require('../models/user.model');
 const { logActivity } = require('../utils/activityLogger');
@@ -97,14 +98,20 @@ async function createUser(req, res, next) {
 async function updateUser(req, res, next) {
   try {
     const { id } = req.params;
-    const { rol, estado } = req.body;
+    const { rol, estado, disponibilidad, disponibilidadHasta, disponibilidadMotivo } = req.body;
 
     // No permitir que el admin se modifique a sí mismo aquí
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({ error: true, message: 'No podés modificar tu propia cuenta desde aquí' });
     }
 
-    const updated = await UserModel.updateRolEstado(id, { rol, estado });
+    if (disponibilidad !== undefined && !['disponible', 'ausente', 'vacaciones'].includes(disponibilidad)) {
+      return res.status(422).json({ error: true, message: 'Disponibilidad inválida' });
+    }
+    if (disponibilidadHasta && !/^\d{4}-\d{2}-\d{2}$/.test(disponibilidadHasta)) {
+      return res.status(422).json({ error: true, message: 'La fecha de regreso debe tener formato AAAA-MM-DD' });
+    }
+    const updated = await UserModel.updateRolEstado(id, { rol, estado, disponibilidad, disponibilidadHasta, disponibilidadMotivo });
 
     if (!updated) {
       return res.status(404).json({ error: true, message: 'Usuario no encontrado' });

@@ -1,3 +1,4 @@
+export {};
 const pool = require('../config/db');
 
 const UserModel = {
@@ -17,7 +18,7 @@ const UserModel = {
    */
   async findById(id) {
     const [rows] = await pool.execute(
-      `SELECT id, nombre, apellido, correo, username, rol, estado, two_fa_enabled, 
+      `SELECT id, nombre, apellido, correo, username, rol, estado, disponibilidad, disponibilidad_hasta, disponibilidad_motivo, two_fa_enabled, 
               google_id, facebook_id, github_id, creado_en
        FROM usuarios WHERE id = ? LIMIT 1`,
       [id]
@@ -42,7 +43,7 @@ const UserModel = {
    */
   async findAll() {
     const [rows] = await pool.execute(
-      `SELECT id, nombre, apellido, correo, username, rol, estado, 
+      `SELECT id, nombre, apellido, correo, username, rol, estado, disponibilidad, disponibilidad_hasta, disponibilidad_motivo, 
               two_fa_enabled, creado_por, creado_en, actualizado_en
        FROM usuarios ORDER BY creado_en DESC`
     );
@@ -51,12 +52,20 @@ const UserModel = {
 
   async findActiveDentists() {
     const [rows] = await pool.execute(
-      `SELECT id, nombre, apellido
+      `SELECT id, nombre, apellido, disponibilidad, disponibilidad_hasta, disponibilidad_motivo
        FROM usuarios
        WHERE rol = 'odontologo' AND estado = 'activo'
        ORDER BY apellido ASC, nombre ASC`
     );
     return rows;
+  },
+
+  async findDentistAvailability(id) {
+    const [rows] = await pool.execute(
+      `SELECT id, nombre, apellido, estado, disponibilidad, disponibilidad_hasta, disponibilidad_motivo
+       FROM usuarios WHERE id = ? AND rol = 'odontologo' LIMIT 1`, [id]
+    );
+    return rows[0] || null;
   },
 
   /**
@@ -99,7 +108,7 @@ const UserModel = {
   /**
    * Actualiza rol y/o estado de un usuario
    */
-  async updateRolEstado(id, { rol, estado }) {
+  async updateRolEstado(id, { rol, estado, disponibilidad, disponibilidadHasta, disponibilidadMotivo }) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -108,10 +117,18 @@ const UserModel = {
         await connection.rollback();
         return false;
       }
-      await connection.execute(
-        `UPDATE usuarios SET rol = COALESCE(?, rol), estado = COALESCE(?, estado) WHERE id = ?`,
-        [rol || null, estado || null, id]
-      );
+      if (disponibilidad !== undefined) {
+        await connection.execute(
+          `UPDATE usuarios SET rol = COALESCE(?, rol), estado = COALESCE(?, estado),
+           disponibilidad = ?, disponibilidad_hasta = ?, disponibilidad_motivo = ? WHERE id = ?`,
+          [rol || null, estado || null, disponibilidad, disponibilidadHasta || null, disponibilidadMotivo || null, id]
+        );
+      } else {
+        await connection.execute(
+          `UPDATE usuarios SET rol = COALESCE(?, rol), estado = COALESCE(?, estado) WHERE id = ?`,
+          [rol || null, estado || null, id]
+        );
+      }
       if (estado) {
         await connection.execute(`UPDATE pacientes SET estado = ? WHERE usuario_id = ?`, [estado, id]);
       }

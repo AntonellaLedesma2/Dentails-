@@ -1,3 +1,4 @@
+export {};
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
@@ -232,7 +233,7 @@ function allowedOAuthRedirectUris() {
   return [...new Set(configured)];
 }
 
-function oauthClientConfigurations(provider) {
+function oauthClientConfigurations(provider): any[] {
   if (provider === 'google') {
     return [
       {
@@ -280,15 +281,15 @@ function oauthClientConfigurations(provider) {
 
 async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVerifier) {
   if (!allowedOAuthRedirectUris().includes(redirectUri)) {
-    const error = new Error(`URI de retorno no permitida: ${redirectUri}`);
-    error.status = 400;
+    const error: any = new Error(`URI de retorno no permitida: ${redirectUri}`);
+    (error as any).status = 400;
     throw error;
   }
 
   const config = oauthClientConfigurations(provider).find((candidate) => candidate.clientId === clientId);
   if (!config || (config.requiresSecret !== false && !config.clientSecret)) {
-    const error = new Error(`El cliente OAuth de ${provider} no está configurado correctamente en el servidor.`);
-    error.status = 503;
+    const error: any = new Error(`El cliente OAuth de ${provider} no está configurado correctamente en el servidor.`);
+    (error as any).status = 503;
     throw error;
   }
 
@@ -318,7 +319,7 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
       redirectUri,
     });
     const error = new Error('El proveedor rechazó el código de autenticación. Verificá las credenciales y la URI de retorno.');
-    error.status = 401;
+    (error as any).status = 401;
     throw error;
   }
 
@@ -330,7 +331,7 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
     profile = await response.json();
     if (!response.ok || profile.email_verified !== true) {
       const error = new Error('Google no devolvió un correo verificado.');
-      error.status = 401;
+      (error as any).status = 401;
       throw error;
     }
     profile.oauthId = profile.sub;
@@ -347,7 +348,7 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
       : null;
     if (!userResponse.ok || !emailsResponse.ok || !user.id || !email) {
       const error = new Error('GitHub no devolvió un correo verificado y principal.');
-      error.status = 401;
+      (error as any).status = 401;
       throw error;
     }
     profile = { oauthId: String(user.id), email, name: user.name || user.login };
@@ -356,7 +357,7 @@ async function exchangeOAuthCode(provider, clientId, code, redirectUri, codeVeri
     profile = await response.json();
     if (!response.ok || !profile.id || !profile.email) {
       const error = new Error('Facebook no devolvió el correo. Revisá el permiso email en Meta for Developers.');
-      error.status = 401;
+      (error as any).status = 401;
       throw error;
     }
     profile.oauthId = profile.id;
@@ -385,7 +386,7 @@ async function verifyGoogleIdToken(idToken, clientId) {
   const allowedClient = oauthClientConfigurations('google').some((candidate) => candidate.clientId === clientId);
   if (!allowedClient) {
     const error = new Error('El cliente Google enviado no está autorizado en el servidor.');
-    error.status = 401;
+    (error as any).status = 401;
     throw error;
   }
 
@@ -398,7 +399,7 @@ async function verifyGoogleIdToken(idToken, clientId) {
   }
   if (!payload?.sub || !payload.email || payload.email_verified !== true) {
     const error = new Error('Google rechazó la identidad o el correo no está verificado.');
-    error.status = 401;
+    (error as any).status = 401;
     throw error;
   }
   return normalizeOAuthProfile({ ...payload, name: payload.name || `${payload.given_name || ''} ${payload.family_name || ''}` }, payload.sub);
@@ -409,7 +410,7 @@ async function verifyFacebookAccessToken(accessToken, clientId) {
   const appSecret = process.env.FACEBOOK_APP_SECRET;
   if (!appId || !appSecret || clientId !== appId) {
     const error = new Error('Facebook no está configurado correctamente en el servidor.');
-    error.status = 503;
+    (error as any).status = 503;
     throw error;
   }
 
@@ -422,7 +423,7 @@ async function verifyFacebookAccessToken(accessToken, clientId) {
   const token = debugResult.data;
   if (!debugResponse.ok || !token?.is_valid || token.app_id !== appId) {
     const error = new Error('Facebook devolvió un token inválido para esta aplicación.');
-    error.status = 401;
+    (error as any).status = 401;
     throw error;
   }
 
@@ -433,7 +434,7 @@ async function verifyFacebookAccessToken(accessToken, clientId) {
   const profile = await profileResponse.json();
   if (!profileResponse.ok || !profile.id || !profile.email) {
     const error = new Error('Facebook no devolvió el correo. Revisá que el permiso email esté habilitado.');
-    error.status = 401;
+    (error as any).status = 401;
     throw error;
   }
   return normalizeOAuthProfile(profile, profile.id);

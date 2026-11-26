@@ -1,3 +1,4 @@
+export {};
 const pool = require('../config/db');
 
 const PatientModel = {
